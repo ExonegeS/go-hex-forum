@@ -1,0 +1,6 @@
+CREATE TABLE x (
+    id SERIAL PRIMARY KEY,
+    data TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);

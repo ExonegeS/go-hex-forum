@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:latest
+    container_name: forum_postgres
+    env_file:
+      - ./.env
+    ports:
+      - 5432:5432
+    volumes:
+      - ./scripts/db_init_scripts:/docker-entrypoint-initdb.d
+  db-test:
+    image: postgres:latest
+    container_name: forum_postgres_test
+    env_file:
+      - ./.env.test
+    ports:
+      - 5444:5432
+    volumes:
+      - ./scripts/test_db_init_scripts:/docker-entrypoint-initdb.d
