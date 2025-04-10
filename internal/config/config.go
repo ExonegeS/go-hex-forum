@@ -1,8 +1,10 @@
 package config
 
 import (
+	"bufio"
 	"fmt"
 	"os"
+	"strings"
 )
 
 type Config struct {
@@ -23,7 +25,13 @@ type DataBase struct {
 	DBName     string
 }
 
-func Load() Config {
+func Load(filename string) Config {
+	if filename == "" {
+		filename = ".env"
+	}
+	if err := LoadEnv(filename); err != nil {
+		fmt.Printf("Error loading %s file: %v\n", filename, err)
+	}
 	return Config{
 		Server{
 			Address: getEnv("ADDRESS", ""),
@@ -37,6 +45,30 @@ func Load() Config {
 			DBName:     getEnv("DB_NAME", "test"),
 		},
 	}
+}
+
+func LoadEnv(filename string) error {
+	file, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			key, value := parts[0], parts[1]
+			err := os.Setenv(key, value)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (d *DataBase) MakeConnectionString() string {

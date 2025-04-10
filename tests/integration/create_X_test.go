@@ -20,7 +20,7 @@ import (
 )
 
 func TestHTTPCreateX(t *testing.T) {
-	cfg := config.Load()
+	cfg := config.Load("../../.env.test")
 	db, err := sql.Open("postgres", fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		cfg.DB.DBHost,
