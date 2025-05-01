@@ -17,5 +17,5 @@ type UserData struct {
 }
 
 func (s Session) IsExpired() bool {
-	return time.Now().After(s.ExpiresAt)
+	return time.Now().UTC().After(s.ExpiresAt)
 }

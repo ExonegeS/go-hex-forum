@@ -2,14 +2,12 @@ package service
 
 import (
 	"context"
-	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"go-hex-forum/config"
 	"go-hex-forum/internal/core/domain"
-	"os"
 	"time"
 )
 
@@ -60,15 +58,14 @@ func NewSessionService(sessionsRepo SessionRepository, timeSource func() time.Ti
 // 	return sessionToken, nil
 // }
 
-func (s *SessionService) StoreNewSession() (plainToken string, err error) {
-	// 1. Генерируем raw-токен
-	raw := make([]byte, 32)
-	if _, err = rand.Read(raw); err != nil {
+func (s *SessionService) StoreNewSession() (string, error) {
+	// Генерируем токен
+	plainToken, err := generateSessionToken()
+	if err != nil {
 		return "", err
 	}
-	plainToken = hex.EncodeToString(raw)
 
-	// 2. Хэшируем SHA-256
+	// Хэшируем SHA-256
 	h := sha256.Sum256([]byte(plainToken))
 	tokenHash := hex.EncodeToString(h[:])
 
@@ -80,7 +77,6 @@ func (s *SessionService) StoreNewSession() (plainToken string, err error) {
 		ExpiresAt: now.Add(time.Duration(s.cfg.DefaultTTL) * time.Second),
 	}
 
-	// 3. Сохраняем в хранилище
 	if err = s.sessionRepo.Store(context.Background(), rec); err != nil {
 		return "", err
 	}
@@ -88,37 +84,31 @@ func (s *SessionService) StoreNewSession() (plainToken string, err error) {
 	return plainToken, nil
 }
 
-// ValidateSession по plain-token возвращает Session или ошибку
-func (s *SessionService) ValidateSession(plainToken string) (*domain.Session, error) {
-	// 1. Хэшируем вход
+func (s *SessionService) GetSessionByToken(plainToken string) (*domain.Session, error) {
+	// Хэшируем токен
 	h := sha256.Sum256([]byte(plainToken))
 	tokenHash := hex.EncodeToString(h[:])
 
-	// 2. Загружаем из репозитория
-	rec, err := s.sessionRepo.GetByHashedToken(context.Background(), tokenHash)
+	// Загружаем сессию из репозитория
+	session, err := s.sessionRepo.GetByHashedToken(context.Background(), tokenHash)
 	if err != nil {
 		return nil, ErrSessionNotFound
 	}
 
-	// 3. Проверяем истечение
-	if time.Now().UTC().After(rec.ExpiresAt) {
+	// Проверяем истечение
+	if session.IsExpired() {
 		// можно и удалить сразу: s.repo.DeleteByHash(tokenHash)
 		return nil, ErrSessionExpired
 	}
 
-	return &domain.Session{
-		ID:        rec.ID,
-		TokenHash: rec.TokenHash,
-		User:      rec.User,
-		CreatedAt: rec.CreatedAt,
-		ExpiresAt: rec.ExpiresAt,
-	}, nil
+	return session, nil
 }
 
-func generateFingerprint(ip, userAgent string) string {
-	secret := []byte(os.Getenv("FINGERPRINT_PEPPER"))
-	h := hmac.New(sha256.New, secret)
-	h.Write([]byte(ip))
-	h.Write([]byte(userAgent))
-	return base64.URLEncoding.EncodeToString(h.Sum(nil))
+func generateSessionToken() (string, error) {
+	bytes := make([]byte, 32) // 256 бит
+	_, err := rand.Read(bytes)
+	if err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(bytes), nil
 }

@@ -33,7 +33,7 @@ func (s *APIServer) Run() error {
 
 	SessionMiddleware := SessionHandler.WithSessionToken(int64(s.cfg.SessionConfig.DefaultTTL.Seconds()))
 	timeoutMW := middleware.NewTimoutContextMW(15)
-	MWChain := middleware.NewMiddlewareChain(middleware.RecoveryMW, timeoutMW, SessionMiddleware)
+	MWChain := middleware.NewMiddlewareChain(middleware.RecoveryMW, timeoutMW, SessionMiddleware, SessionHandler.RequireValidSession)
 
 	serverAddress := fmt.Sprintf("%s:%s", s.cfg.Server.Address, s.cfg.Server.Port)
 	s.logger.Info("starting server", slog.String("host", serverAddress))

@@ -1,12 +1,18 @@
 package handlers
 
 import (
+	"context"
+	"errors"
+	"go-hex-forum/internal/core/domain"
+	"go-hex-forum/internal/core/service"
+	"log"
 	"net/http"
 	"time"
 )
 
 type SessionService interface {
 	StoreNewSession() (sessionToken string, err error)
+	GetSessionByToken(string) (*domain.Session, error)
 }
 
 type SessionHandler struct {
@@ -28,32 +34,64 @@ func helloworld(w http.ResponseWriter, r *http.Request) {
 func (s *SessionHandler) WithSessionToken(expirationInSec int64) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Пытаемся прочитать куку
 			cookie, err := r.Cookie("session_token")
+			var token string
 			if err != nil || cookie.Value == "" {
-				// Нет токена — создаём новую сессию
 				token, err := s.service.StoreNewSession()
 				if err != nil {
 					http.Error(w, "failed to create session", http.StatusInternalServerError)
 					return
 				}
-				// Устанавливаем куку с нужными параметрами
+
 				http.SetCookie(w, &http.Cookie{
 					Name:     "session_token",
 					Value:    token,
-					Path:     "/",
 					Expires:  time.Now().Add(time.Duration(expirationInSec) * time.Second),
 					HttpOnly: true,
-					Secure:   false, // или true, если HTTPS
+					Secure:   true,
 					SameSite: http.SameSiteLaxMode,
+					Path:     "/",
 				})
-				// Обновляем request context, чтобы дальше могли взять токен
-				r = r.Clone(r.Context())
-				r.AddCookie(&http.Cookie{Name: "session_token", Value: token})
+
+			} else {
+				token = cookie.Value
 			}
 
-			// Передаём управление следующему обработчику
-			next.ServeHTTP(w, r)
+			ctx := context.WithValue(r.Context(), "session_token", token)
+			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
+}
+
+func (s *SessionHandler) RequireValidSession(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie("session_token")
+		if err != nil || cookie.Value == "" {
+			http.Error(w, "unauthorized: no session token", http.StatusUnauthorized)
+			return
+		}
+
+		session, err := s.service.GetSessionByToken(cookie.Value)
+		if err != nil || session == nil {
+			if errors.Is(err, service.ErrSessionExpired) {
+				http.SetCookie(w, &http.Cookie{
+					Name:     "session_token",
+					Value:    "",
+					Path:     "/",
+					Expires:  time.Unix(0, 0),
+					MaxAge:   -1,
+					HttpOnly: true,
+					Secure:   true,
+					SameSite: http.SameSiteLaxMode,
+				})
+				http.Error(w, "unauthorized: expired session", http.StatusUnauthorized)
+				return
+			}
+			http.Error(w, "unauthorized: invalid session", http.StatusUnauthorized)
+			log.Print(err.Error())
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
