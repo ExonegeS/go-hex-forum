@@ -1,0 +1,31 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: hacker
+      DB_PASSWORD: "0000"
+      DB_NAME: forum
+    depends_on:
+      db:
+        condition: service_healthy
+        restart: true
+  db:
+    image: postgres:17
+    environment:
+      - POSTGRES_USER=hacker
+      - POSTGRES_PASSWORD=0000
+      - POSTGRES_DB=forum
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db_init_sql:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hacker -d forum"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
