@@ -1,8 +1,7 @@
-CREATE TABLE sessions (
+CREATE TABLE sessions(
     id SERIAL PRIMARY KEY,
-    session_hash CHAR(64) UNIQUE NOT NULL, -- SHA256
-    avatar_url TEXT NOT NULL,
-    username TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    expires_at TIMESTAMPTZ NOT NULL
+    session_hash TEXT NOT NULL UNIQUE,
+    user_id INT NOT NULL REFERENCES users(id),
+    created_at TIMESTAMP NOT NULL,
+    expires_at TIMESTAMP NOT NULL
 );

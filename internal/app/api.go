@@ -31,6 +31,11 @@ func (s *APIServer) Run() error {
 	SessionHandler := handlers.NewSessionHandler(SessionService)
 	SessionHandler.RegisterEndpoints(mux)
 
+	PostRepository := postgres.NewPostRepository(s.db)
+	PostService := service.NewPostService(PostRepository)
+	PostHandler := handlers.NewPostHandler(PostService)
+	PostHandler.RegisterEndpoints(mux)
+
 	SessionMiddleware := SessionHandler.WithSessionToken(int64(s.cfg.SessionConfig.DefaultTTL.Seconds()))
 	timeoutMW := middleware.NewTimoutContextMW(15)
 	MWChain := middleware.NewMiddlewareChain(middleware.RecoveryMW, timeoutMW, SessionMiddleware, SessionHandler.RequireValidSession)

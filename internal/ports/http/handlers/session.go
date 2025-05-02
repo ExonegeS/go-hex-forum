@@ -3,8 +3,10 @@ package handlers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"go-hex-forum/internal/core/domain"
 	"go-hex-forum/internal/core/service"
+	"go-hex-forum/internal/utils"
 	"log"
 	"net/http"
 	"time"
@@ -16,7 +18,7 @@ type SessionService interface {
 }
 
 type SessionHandler struct {
-	service SessionService
+	SessionService SessionService
 }
 
 func NewSessionHandler(sessionService SessionService) SessionHandler {
@@ -37,9 +39,10 @@ func (s *SessionHandler) WithSessionToken(expirationInSec int64) func(next http.
 			cookie, err := r.Cookie("session_token")
 			var token string
 			if err != nil || cookie.Value == "" {
-				token, err := s.service.StoreNewSession()
+				token, err := s.SessionService.StoreNewSession()
+				fmt.Println(token, "token here")
 				if err != nil {
-					http.Error(w, "failed to create session", http.StatusInternalServerError)
+					utils.WriteError(w, http.StatusInternalServerError, errors.New("failed to create session"))
 					return
 				}
 
@@ -67,11 +70,11 @@ func (s *SessionHandler) RequireValidSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie("session_token")
 		if err != nil || cookie.Value == "" {
-			http.Error(w, "unauthorized: no session token", http.StatusUnauthorized)
+			utils.WriteError(w, http.StatusUnauthorized, errors.New("unauthorized: no session token"))
 			return
 		}
-
-		session, err := s.service.GetSessionByToken(cookie.Value)
+		session, err := s.SessionService.GetSessionByToken(cookie.Value)
+		fmt.Printf("%v \n %w", session, err)
 		if err != nil || session == nil {
 			if errors.Is(err, service.ErrSessionExpired) {
 				http.SetCookie(w, &http.Cookie{
@@ -84,14 +87,15 @@ func (s *SessionHandler) RequireValidSession(next http.Handler) http.Handler {
 					Secure:   true,
 					SameSite: http.SameSiteLaxMode,
 				})
-				http.Error(w, "unauthorized: expired session", http.StatusUnauthorized)
+				utils.WriteError(w, http.StatusUnauthorized, errors.New("unauthorized: expired session"))
 				return
 			}
-			http.Error(w, "unauthorized: invalid session", http.StatusUnauthorized)
+			utils.WriteError(w, http.StatusUnauthorized, errors.New("unauthorized: invalid session"))
 			log.Print(err.Error())
 			return
 		}
-
-		next.ServeHTTP(w, r)
+		userID := session.User.ID
+		ctx := context.WithValue(r.Context(), "user_id", userID)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

@@ -12,6 +12,7 @@ type Session struct {
 }
 
 type UserData struct {
+	ID        int64
 	Name      string
 	AvatarURL string
 }

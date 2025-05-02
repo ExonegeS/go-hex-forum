@@ -9,6 +9,7 @@ type Post struct {
 	Content    string
 	ImagePath  string // S3 object path (пример: "posts/abc123.jpg")
 	CreatedAt  time.Time
+	ExpiresAt  time.Time
 	IsArchived bool
 }
 
