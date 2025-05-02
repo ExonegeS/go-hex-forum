@@ -6,7 +6,6 @@ type Session struct {
 	ID        int64
 	TokenHash string // Захэшированный токен для безопасности
 	User      UserData
-	Name      string // Имя из API (может быть изменено пользователем)
 	ExpiresAt time.Time
 	CreatedAt time.Time
 }

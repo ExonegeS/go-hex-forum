@@ -12,6 +12,7 @@ type (
 		Server        Server
 		DataBase      DataBase
 		SessionConfig SessionConfig
+		Storage       Storage
 	}
 
 	Server struct {
@@ -29,6 +30,12 @@ type (
 
 	SessionConfig struct {
 		DefaultTTL    time.Duration
+		MaxNameLength int64
+	}
+
+	Storage struct {
+		Host          string
+		Port          string
 		MaxNameLength int64
 	}
 )
@@ -50,6 +57,11 @@ func NewConfig() *Config {
 			DefaultTTL:    time.Duration(getEnvInt64("SESSION_TTL", 7*24*60*60)) * time.Second,
 			MaxNameLength: getEnvInt64("SESSION_TOKEN_LENGTH", 10),
 		},
+		Storage{
+			Host:          getEnvStr("STORAGE_HOST", "http://localhost"),
+			Port:          getEnvStr("STORAGE_PORT", "6969"),
+			MaxNameLength: getEnvInt64("STORAGE_CODE_LENGTH", 6),
+		},
 	}
 }
 
@@ -57,6 +69,14 @@ func (d *DataBase) MakeConnectionString() string {
 	return fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		d.DBHost, d.DBPort, d.DBUser, d.DBPassword, d.DBName,
+	)
+}
+
+func (s *Storage) MakeAddressString() string {
+	return fmt.Sprintf(
+		"%s:%s",
+		s.Host,
+		s.Port,
 	)
 }
 

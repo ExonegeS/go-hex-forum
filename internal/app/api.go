@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go-hex-forum/config"
 	"go-hex-forum/internal/adapters/postgres"
+	"go-hex-forum/internal/adapters/storage"
 	"go-hex-forum/internal/core/service"
 	"go-hex-forum/internal/ports/http/handlers"
 	"go-hex-forum/internal/ports/http/middleware"
@@ -32,13 +33,14 @@ func (s *APIServer) Run() error {
 	SessionHandler.RegisterEndpoints(mux)
 
 	PostRepository := postgres.NewPostRepository(s.db)
-	PostService := service.NewPostService(PostRepository)
+	ImageStorage := storage.NewImageStorage(s.cfg.Storage.MakeAddressString(), s.cfg.Storage.MaxNameLength)
+	PostService := service.NewPostService(PostRepository, ImageStorage)
 	PostHandler := handlers.NewPostHandler(PostService)
 	PostHandler.RegisterEndpoints(mux)
 
 	SessionMiddleware := SessionHandler.WithSessionToken(int64(s.cfg.SessionConfig.DefaultTTL.Seconds()))
 	timeoutMW := middleware.NewTimoutContextMW(15)
-	MWChain := middleware.NewMiddlewareChain(middleware.RecoveryMW, timeoutMW, SessionMiddleware, SessionHandler.RequireValidSession)
+	MWChain := middleware.NewMiddlewareChain(timeoutMW, SessionMiddleware, SessionHandler.RequireValidSession)
 
 	serverAddress := fmt.Sprintf("%s:%s", s.cfg.Server.Address, s.cfg.Server.Port)
 	s.logger.Info("starting server", slog.String("host", serverAddress))

@@ -39,25 +39,6 @@ func NewSessionService(sessionsRepo SessionRepository, timeSource func() time.Ti
 	}
 }
 
-// func (s *SessionsService) CreateSession(ctx context.Context, ip, userAgent string) (string, error) {
-
-// 	session := entity.Session{
-// 		// Name:        s.userDataAPI.GetName(),
-// 		// Avatar:      s.userDataAPI.GetAvatarLink(),
-// 		ExpiresAt:   s.timeSource().Add(s.cfg.DefaultTTL),
-// 		Fingerprint: generateFingerprint(ip, userAgent),
-// 		IP:          ip,
-// 		UserAgent:   userAgent,
-// 	}
-
-// 	sessionID, err := s.sessionsRepo.Store(ctx, session)
-// 	if err != nil {
-// 		return "", fmt.Errorf("session storage failed: %w", err)
-// 	}
-
-// 	return sessionToken, nil
-// }
-
 func (s *SessionService) StoreNewSession() (string, error) {
 	// Генерируем токен
 	plainToken, err := generateSessionToken()
@@ -74,7 +55,7 @@ func (s *SessionService) StoreNewSession() (string, error) {
 		TokenHash: tokenHash,
 		// User:      user,
 		CreatedAt: now,
-		ExpiresAt: now.Add(time.Duration(s.cfg.DefaultTTL) * time.Second),
+		ExpiresAt: now.Add(time.Duration(s.cfg.DefaultTTL)),
 	}
 
 	if err = s.sessionRepo.Store(context.Background(), rec); err != nil {
