@@ -1,0 +1,13 @@
+{{define "header"}}
+<div class="header">
+    {{if .Session}}
+        <div>User: {{.Session.User.Name}} <img src="{{.Session.User.AvatarURL}}" width="60"></div>
+        <form action="/session" method="POST">
+            <button type="submit">New Identity</button>
+        </form>
+    {{else}}
+        <div>Anonymous</div>
+    {{end}}
+    <hr>
+</div>
+{{end}}

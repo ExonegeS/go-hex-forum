@@ -5,7 +5,7 @@ import "time"
 type Comment struct {
 	ID        int64
 	PostID    int64
-	User      UserData
+	ParentCommentID *int64
 	Content   string
 	ImagePath string // S3 path для изображений комментария
 	CreatedAt time.Time

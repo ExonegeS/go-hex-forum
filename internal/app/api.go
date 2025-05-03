@@ -29,7 +29,7 @@ func (s *APIServer) Run() error {
 	mux := http.NewServeMux()
 
 	SessionsRepository := postgres.NewSessionRepository(s.db)
-	userdataProvider := rickmorty.NewUserDataProvider("https://rickandmortyapi.com/api", 10)
+	userdataProvider := rickmorty.NewUserDataProvider("https://rickandmortyapi.com/api", 826)
 	SessionService := service.NewSessionService(SessionsRepository, time.Now, userdataProvider, s.cfg.SessionConfig)
 	SessionHandler := handlers.NewSessionHandler(SessionService)
 	SessionHandler.RegisterEndpoints(mux)
@@ -39,6 +39,12 @@ func (s *APIServer) Run() error {
 	PostService := service.NewPostService(PostRepository, ImageStorage)
 	PostHandler := handlers.NewPostHandler(PostService)
 	PostHandler.RegisterEndpoints(mux)
+
+	frontendHandler, err := handlers.NewFrontendHandler(PostService, SessionService)
+	if err != nil {
+		return fmt.Errorf("failed to create frontend handler: %w", err)
+	}
+	frontendHandler.RegisterFrontendEndpoints(mux)
 
 	SessionMiddleware := SessionHandler.WithSessionToken(int64(s.cfg.SessionConfig.DefaultTTL.Seconds()))
 	timeoutMW := middleware.NewTimoutContextMW(15)

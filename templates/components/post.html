@@ -1,0 +1,36 @@
+{{define "post"}}
+<div class="post {{if .Archived}}archived{{end}}">
+    <div class="meta">
+        {{if .ImageURL}}
+        <img src="{{.ImageURL}}" style="max-width: 200px">
+        {{end}}
+        <span class="author">{{.User.Name}}</span>
+        <span class="time">{{.CreatedAt.Format "Jan 02 15:04"}}</span>
+    </div>
+    <h3>{{.Title}}</h3>
+    <p>{{.Content}}</p>
+
+    {{if .Comments}}
+    <div class="comments">
+        {{range .Comments}}
+            {{template "comment" .}}
+        {{end}}
+    </div>
+    {{end}}
+
+    <form action="/post/{{.ID}}/comment" method="POST">
+        <textarea name="content" rows="2"></textarea>
+        <button type="submit">Reply</button>
+    </form>
+</div>
+{{end}}
+
+{{define "comment"}}
+<div class="comment">
+    <div class="meta">
+        <span class="author">{{.User.Name}}</span>
+        <span class="time">{{.CreatedAt.Format "15:04"}}</span>
+    </div>
+    <p>{{.Content}}</p>
+</div>
+{{end}}

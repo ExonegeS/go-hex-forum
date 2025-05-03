@@ -26,7 +26,7 @@ func NewSessionHandler(sessionService SessionService) SessionHandler {
 }
 
 func (s *SessionHandler) RegisterEndpoints(mux *http.ServeMux) {
-	mux.HandleFunc("/", helloworld)
+	// mux.HandleFunc("/", helloworld)
 }
 
 func helloworld(w http.ResponseWriter, r *http.Request) {
@@ -94,8 +94,7 @@ func (s *SessionHandler) RequireValidSession(next http.Handler) http.Handler {
 			log.Print(err.Error())
 			return
 		}
-		userID := session.User.ID
-		ctx := context.WithValue(r.Context(), "user_id", userID)
+		ctx := context.WithValue(r.Context(), "session", session)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

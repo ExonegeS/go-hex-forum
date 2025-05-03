@@ -1,0 +1,19 @@
+{{ define "main" }}
+<div class="post-list">
+    {{ range .Posts }}
+    <div class="post {{ if .IsArchived }}archived{{ end }}">
+        <div class="post-header">
+            <span class="author">{{ .PostAuthor.Name }}</span>
+            <img src="{{.PostAuthor.AvatarURL}}" width="30">
+            <span class="timestamp">{{ .CreatedAt.Format "2006-01-02 15:04" }}</span>
+        </div>
+        {{ if .ImagePath   }}
+        <img src="{{ .ImagePath   }}" class="preview">
+        {{ end }}
+        <h2>{{ .Title }}</h2>
+        <p>{{ .Content }}</p>
+        <a href="/post/{{ .ID }}">View post</a>
+    </div>
+    {{ end }}
+</div>
+{{ end }}

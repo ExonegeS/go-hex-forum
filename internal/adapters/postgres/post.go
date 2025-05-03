@@ -15,14 +15,20 @@ func NewPostRepository(db *sql.DB) *PostRepository {
 }
 
 func (r *PostRepository) SavePost(ctx context.Context, post *domain.Post, userID int64) (int64, error) {
+	query := `INSERT INTO posts (user_id, title, content,image_path, created_at, expires_at)
+	VALUES ($1, $2, $3, $4, $5,$6)
+	RETURNING id`
+	// Handle nullable image path
+	imagePath := sql.NullString{
+		String: post.ImagePath,
+		Valid:  post.ImagePath != "",
+	}
 	var id int64
-	err := r.db.QueryRowContext(ctx, `
-	INSERT INTO posts (user_id, title, content, created_at, expires_at)
-	VALUES ($1, $2, $3, $4, $5)
-	RETURNING id`,
+	err := r.db.QueryRowContext(ctx, query,
 		userID,
 		post.Title,
 		post.Content,
+		imagePath,
 		post.CreatedAt,
 		post.ExpiresAt,
 	).Scan(&id)

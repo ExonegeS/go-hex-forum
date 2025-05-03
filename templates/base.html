@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{.Title}} - Imageboard</title>
+    <style>
+        /* Add basic styling */
+        body { font-family: sans-serif; max-width: 800px; margin: 0 auto; }
+        .post { border: 1px solid #ddd; padding: 1rem; margin: 1rem 0; }
+        .comment { margin-left: 2rem; padding-left: 1rem; border-left: 2px solid #eee; }
+        .archived { opacity: 0.6; }
+        img.preview { max-width: 200px; max-height: 200px; }
+    </style>
+</head>
+<body>
+    {{ template "header" . }}
+    
+    <main>
+        {{ template "main" . }}
+    </main>
+</body>
+</html>
