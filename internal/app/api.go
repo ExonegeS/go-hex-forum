@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go-hex-forum/config"
 	"go-hex-forum/internal/adapters/postgres"
+	rickmorty "go-hex-forum/internal/adapters/rickmorty_client"
 	"go-hex-forum/internal/adapters/storage"
 	"go-hex-forum/internal/core/service"
 	"go-hex-forum/internal/ports/http/handlers"
@@ -28,7 +29,8 @@ func (s *APIServer) Run() error {
 	mux := http.NewServeMux()
 
 	SessionsRepository := postgres.NewSessionRepository(s.db)
-	SessionService := service.NewSessionService(SessionsRepository, time.Now, nil, s.cfg.SessionConfig)
+	userdataProvider := rickmorty.NewUserDataProvider("https://rickandmortyapi.com/api", 10)
+	SessionService := service.NewSessionService(SessionsRepository, time.Now, userdataProvider, s.cfg.SessionConfig)
 	SessionHandler := handlers.NewSessionHandler(SessionService)
 	SessionHandler.RegisterEndpoints(mux)
 

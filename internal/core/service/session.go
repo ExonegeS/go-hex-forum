@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"fmt"
 	"go-hex-forum/config"
 	"go-hex-forum/internal/core/domain"
 	"time"
@@ -19,8 +20,7 @@ type SessionRepository interface {
 }
 
 type UserDataProvider interface {
-	GetAvatarLink() string
-	GetName() string
+	GetUserData(ttl time.Duration) (domain.UserData, error)
 }
 
 type SessionService struct {
@@ -40,26 +40,31 @@ func NewSessionService(sessionsRepo SessionRepository, timeSource func() time.Ti
 }
 
 func (s *SessionService) StoreNewSession() (string, error) {
-	// Генерируем токен
+	// Get user data with session TTL
+	userData, err := s.userDataAPI.GetUserData(s.cfg.DefaultTTL)
+	if err != nil {
+		return "", fmt.Errorf("failed to get user data: %w", err)
+	}
+
+	fmt.Println(userData)
+
+	// Generate session token
 	plainToken, err := generateSessionToken()
 	if err != nil {
 		return "", err
 	}
 
-	// Хэшируем SHA-256
+	// Create session record
 	h := sha256.Sum256([]byte(plainToken))
-	tokenHash := hex.EncodeToString(h[:])
-
-	now := time.Now().UTC()
-	rec := domain.Session{
-		TokenHash: tokenHash,
-		// User:      user,
-		CreatedAt: now,
-		ExpiresAt: now.Add(time.Duration(s.cfg.DefaultTTL)),
+	session := domain.Session{
+		TokenHash: hex.EncodeToString(h[:]),
+		User:      userData,
+		CreatedAt: s.timeSource(),
+		ExpiresAt: s.timeSource().Add(s.cfg.DefaultTTL),
 	}
 
-	if err = s.sessionRepo.Store(context.Background(), rec); err != nil {
-		return "", err
+	if err := s.sessionRepo.Store(context.Background(), session); err != nil {
+		return "", fmt.Errorf("failed to store session: %w", err)
 	}
 
 	return plainToken, nil

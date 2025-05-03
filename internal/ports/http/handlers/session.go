@@ -74,7 +74,7 @@ func (s *SessionHandler) RequireValidSession(next http.Handler) http.Handler {
 			return
 		}
 		session, err := s.SessionService.GetSessionByToken(cookie.Value)
-		fmt.Printf("%v \n %w", session, err)
+		fmt.Printf("%#v \n %w", session, err)
 		if err != nil || session == nil {
 			if errors.Is(err, service.ErrSessionExpired) {
 				http.SetCookie(w, &http.Cookie{
