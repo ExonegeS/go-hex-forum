@@ -47,7 +47,7 @@ func (s *APIServer) Run() error {
 	frontendHandler.RegisterFrontendEndpoints(mux)
 
 	SessionMiddleware := SessionHandler.WithSessionToken(int64(s.cfg.SessionConfig.DefaultTTL.Seconds()))
-	timeoutMW := middleware.NewTimoutContextMW(15)
+	timeoutMW := middleware.NewTimeoutContextMW(15)
 	MWChain := middleware.NewMiddlewareChain(timeoutMW, SessionMiddleware, SessionHandler.RequireValidSession)
 
 	serverAddress := fmt.Sprintf("%s:%s", s.cfg.Server.Address, s.cfg.Server.Port)

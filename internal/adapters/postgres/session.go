@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"go-hex-forum/internal/core/domain"
+	"time"
 )
 
 type SessionRepository struct {
@@ -93,6 +94,71 @@ func (r *SessionRepository) GetByHashedToken(ctx context.Context, hashedToken st
 	}
 
 	return &session, nil
+}
+
+func (r *SessionRepository) UpdateByToken(ctx context.Context, hashedToken string, updateFn func(*domain.Session) (bool, error)) error {
+	const op = "SessionRepository.UpdateByToken"
+	return runInTx(r.db, func(tx *sql.Tx) error {
+		query := `SELECT
+            s.id,
+            s.session_hash,
+            s.expires_at,
+            u.id AS user_id,
+            u.name,
+            u.avatar_url
+        FROM sessions s
+        JOIN users u ON s.user_id = u.id
+        WHERE s.session_hash = $1 FOR UPDATE`
+
+		var (
+			id            int64
+			tokenHash     string
+			expiresAt     time.Time
+			userId        int64
+			userName      string
+			userAvatarURL string
+		)
+		err := tx.QueryRowContext(ctx, query, hashedToken).Scan(&id, &tokenHash, &expiresAt, &userId, &userName, &userAvatarURL)
+		if err != nil {
+			return fmt.Errorf("session get error: %w", err)
+		}
+
+		session := &domain.Session{
+			ID:        id,
+			TokenHash: tokenHash,
+			ExpiresAt: expiresAt,
+			User: domain.UserData{
+				ID:        userId,
+				Name:      userName,
+				AvatarURL: userAvatarURL,
+			},
+		}
+
+		updated, err := updateFn(session)
+		if err != nil {
+			return err
+		}
+
+		if !updated {
+			return nil
+		}
+
+		_, err = tx.ExecContext(ctx,
+			"UPDATE sessions SET expires_at = $1 WHERE session_hash = $2",
+			session.ExpiresAt, session.TokenHash)
+		if err != nil {
+			return fmt.Errorf("%s: %w", op, err)
+		}
+
+		_, err = tx.ExecContext(ctx,
+			"UPDATE users SET name = $1, avatar_url = $2 WHERE id = $3",
+			session.User.Name, session.User.AvatarURL, session.User.ID)
+		if err != nil {
+			return fmt.Errorf("%s: %w", op, err)
+		}
+
+		return nil
+	})
 }
 
 func runInTx(db *sql.DB, fn func(tx *sql.Tx) error) error {

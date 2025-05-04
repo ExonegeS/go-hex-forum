@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="referrer" content="no-referrer">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1337b04rd</title>
+    <style>
+        /* Set the background color for the entire body */
+        body {
+            background-color: #E6E9F5;
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        header, footer {
+            text-align: center;
+            padding: 10px 0;
+        }
+
+        nav a {
+            margin: 0 10px;
+            text-decoration: none;
+            color: blue;
+        }
+
+        nav a:hover {
+            text-decoration: underline;
+        }
+
+        /* Styles for the grid layout */
+        .posts .list {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .post {
+            background-color: white;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            width: 15%;
+            margin: 10px;
+            display: flex;
+        }
+
+        .post img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+{{ template "header" . }}
+<main>
+    <section class="posts">
+        <ul class="list">
+            {{range .Posts}}
+                <li class="post">
+                    <a href="/post/{{.ID}}">
+                        <img src="{{ .ImagePath }}" alt="no pic">
+                        <h3>{{.Title}}</h3>
+                    </a>
+                </li>
+            {{end}}
+        </ul>
+    </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{{define "header"}}
+<header>
+    <meta name="referrer" content="no-referrer">
+    <h1>1337b04rd</h1>
+    <h1>Catalog</h1>
+    <nav>
+        <!-- Navigation links -->
+        [<a href="create-post.html">Create Post</a>] |
+        [<a href="archive.html">Archive</a>]
+    </nav>
+    {{if .Session}}
+        User: {{.Session.User.Name}} <img src="{{.Session.User.AvatarURL}}" width="60">
+    {{else}}
+        <div>Anonymous</div>
+    {{end}}
+    <hr>
+</header>
+{{end}}

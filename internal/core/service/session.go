@@ -16,7 +16,7 @@ type SessionRepository interface {
 	Store(context.Context, domain.Session) error
 	GetByHashedToken(context.Context, string) (*domain.Session, error)
 	// DeleteExpired(context.Context, time.Time) (int64, error)
-	// UpdateByID(context.Context, int64, func(*domain.Session) (bool, error)) error
+	UpdateByToken(context.Context, string, func(*domain.Session) (bool, error)) error
 }
 
 type UserDataProvider interface {
@@ -39,7 +39,7 @@ func NewSessionService(sessionsRepo SessionRepository, timeSource func() time.Ti
 	}
 }
 
-func (s *SessionService) StoreNewSession() (string, error) {
+func (s *SessionService) StoreNewSession(ctx context.Context) (string, error) {
 	// Get user data with session TTL
 	userData, err := s.userDataAPI.GetUserData(s.cfg.DefaultTTL)
 	if err != nil {
@@ -63,20 +63,20 @@ func (s *SessionService) StoreNewSession() (string, error) {
 		ExpiresAt: s.timeSource().Add(s.cfg.DefaultTTL),
 	}
 
-	if err := s.sessionRepo.Store(context.Background(), session); err != nil {
+	if err := s.sessionRepo.Store(ctx, session); err != nil {
 		return "", fmt.Errorf("failed to store session: %w", err)
 	}
 
 	return plainToken, nil
 }
 
-func (s *SessionService) GetSessionByToken(plainToken string) (*domain.Session, error) {
+func (s *SessionService) GetSessionByToken(ctx context.Context, plainToken string) (*domain.Session, error) {
 	// Хэшируем токен
 	h := sha256.Sum256([]byte(plainToken))
 	tokenHash := hex.EncodeToString(h[:])
 
 	// Загружаем сессию из репозитория
-	session, err := s.sessionRepo.GetByHashedToken(context.Background(), tokenHash)
+	session, err := s.sessionRepo.GetByHashedToken(ctx, tokenHash)
 	if err != nil {
 		return nil, ErrSessionNotFound
 	}
@@ -88,6 +88,24 @@ func (s *SessionService) GetSessionByToken(plainToken string) (*domain.Session, 
 	}
 
 	return session, nil
+}
+
+func (s *SessionService) UpdateUserName(ctx context.Context, plainToken string, username string) error {
+	h := sha256.Sum256([]byte(plainToken))
+	tokenHash := hex.EncodeToString(h[:])
+	return s.sessionRepo.UpdateByToken(ctx, tokenHash, func(s *domain.Session) (updated bool, err error) {
+		if username != "" {
+			updated = true
+			s.User.Name = username
+		}
+
+		if updated {
+			return
+		}
+
+		err = fmt.Errorf("no fields were updated")
+		return
+	})
 }
 
 func generateSessionToken() (string, error) {

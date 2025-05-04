@@ -3,13 +3,16 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"go-hex-forum/internal/core/domain"
 	"go-hex-forum/internal/utils"
 	"io"
 	"net/http"
 )
 
 type PostService interface {
-	CreateNewPost(ctx context.Context, title, content string, imageData []byte, userID int64) (int64, error)
+	CreateNewPost(ctx context.Context, title, content string, imagePath string, userID int64) (int64, error)
+	GetActivePosts(context.Context) ([]domain.Post, error)
+	GetPostByID(ctx context.Context, postID int64) (domain.Post, error)
 	UploadImage(ctx context.Context, userID int64, imageData []byte) (string, error)
 }
 
@@ -35,30 +38,22 @@ func (h *PostHandler) CreateNewPost(w http.ResponseWriter, r *http.Request) {
 
 	title := r.FormValue("title")
 	content := r.FormValue("content")
+	imagePath := r.FormValue("image-path")
 
-	file, _, err := r.FormFile("image")
-	if err != nil && err != http.ErrMissingFile {
-		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("error reading image: %w", err))
-		return
-	}
-	defer file.Close()
+	// file, _, err := r.FormFile("image")
+	// if err != nil && err != http.ErrMissingFile {
+	// 	utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("error reading image: %w", err))
+	// 	return
+	// }
+	// defer file.Close()
 
-	var imageData []byte
-	if file != nil {
-		imageData, err = io.ReadAll(file)
-		if err != nil {
-			utils.WriteError(w, http.StatusInternalServerError, fmt.Errorf("error reading image data: %w", err))
-			return
-		}
-	}
-
-	userID, ok := r.Context().Value("user_id").(int64)
+	session, ok := r.Context().Value("session").(*domain.Session)
 	if !ok {
-		utils.WriteError(w, http.StatusUnauthorized, fmt.Errorf("user not authenticated"))
+		utils.WriteError(w, http.StatusUnauthorized, fmt.Errorf("user not authenticated", session))
 		return
 	}
 
-	id, err := h.postService.CreateNewPost(r.Context(), title, content, imageData, userID)
+	id, err := h.postService.CreateNewPost(r.Context(), title, content, imagePath, session.User.ID)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, err)
 		return
@@ -77,13 +72,13 @@ func (h *PostHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, ok := r.Context().Value("user_id").(int64)
+	session, ok := r.Context().Value("session").(*domain.Session)
 	if !ok {
 		utils.WriteError(w, http.StatusUnauthorized, fmt.Errorf("user not authenticated"))
 		return
 	}
 
-	url, err := h.postService.UploadImage(r.Context(), userID, imageData)
+	url, err := h.postService.UploadImage(r.Context(), session.User.ID, imageData)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, err)
 		return
