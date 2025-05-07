@@ -15,7 +15,7 @@ func NewCommentRepository(db *sql.DB) *CommentRepository {
 	return &CommentRepository{db}
 }
 
-func (r *CommentRepository) SaveNewComment(ctx context.Context, comment *domain.Comment, userID int64) (int64, error) {
+func (r *CommentRepository) SaveComment(ctx context.Context, comment *domain.Comment) (int64, error) {
 	query := `
         INSERT INTO comments (post_id, user_id, content, image_path)
         VALUES ($1, $2, $3, $4)
@@ -31,7 +31,7 @@ func (r *CommentRepository) SaveNewComment(ctx context.Context, comment *domain.
 	var id int64
 	err := r.db.QueryRowContext(ctx, query,
 		comment.PostID,
-		userID,
+		comment.Author.ID,
 		comment.Content,
 		imagePath,
 	).Scan(&id)
@@ -42,4 +42,43 @@ func (r *CommentRepository) SaveNewComment(ctx context.Context, comment *domain.
 
 	comment.ID = id
 	return id, nil
+}
+
+func (r *CommentRepository) GetByPostID(ctx context.Context, postID int64) ([]*domain.Comment, error) {
+	query := `
+        SELECT c.id, u.name, COALESCE(u.avatar_url, '') AS avatar_url, 
+               c.content, c.image_path, c.created_at
+        FROM comments c
+        JOIN users u ON u.id = c.user_id
+        WHERE c.post_id = $1
+        ORDER BY c.created_at ASC
+    `
+
+	rows, err := r.db.QueryContext(ctx, query, postID)
+	if err != nil {
+		return nil, fmt.Errorf("querying comments: %w", err)
+	}
+	defer rows.Close()
+
+	var comments []*domain.Comment
+	for rows.Next() {
+		var c domain.Comment
+		var imagePath sql.NullString
+		err := rows.Scan(&c.ID, &c.Author.Name, &c.Author.AvatarURL, &c.Content, &imagePath, &c.CreatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("scanning comment: %w", err)
+		}
+		if imagePath.Valid {
+			c.ImagePath = imagePath.String
+		} else {
+			c.ImagePath = ""
+		}
+		comments = append(comments, &c)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating rows: %w", err)
+	}
+
+	return comments, nil
 }

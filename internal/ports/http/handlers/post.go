@@ -10,7 +10,7 @@ import (
 )
 
 type PostService interface {
-	CreateNewPost(ctx context.Context, title, content string, imagePath string, userID int64) (int64, error)
+	CreateNewPost(ctx context.Context, post *domain.Post, imageData []byte) (int64, error)
 	GetActivePosts(context.Context) ([]domain.Post, error)
 	GetPostByID(ctx context.Context, postID int64) (domain.Post, error)
 	UploadImage(ctx context.Context, userID int64, imageData []byte) (string, error)
@@ -38,14 +38,24 @@ func (h *PostHandler) CreateNewPost(w http.ResponseWriter, r *http.Request) {
 
 	title := r.FormValue("title")
 	content := r.FormValue("content")
-	imagePath := r.FormValue("image-path")
 
-	// file, _, err := r.FormFile("image")
-	// if err != nil && err != http.ErrMissingFile {
-	// 	utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("error reading image: %w", err))
-	// 	return
-	// }
-	// defer file.Close()
+	file, _, err := r.FormFile("image")
+	if err != nil && err != http.ErrMissingFile {
+		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("error reading image: %w", err))
+		return
+	}
+	if file != nil {
+		defer file.Close()
+	}
+
+	var imageData []byte
+	if file != nil {
+		imageData, err = io.ReadAll(file)
+		if err != nil {
+			utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("error reading image: %w", err))
+			return
+		}
+	}
 
 	session, ok := r.Context().Value("session").(*domain.Session)
 	if !ok {
@@ -53,15 +63,19 @@ func (h *PostHandler) CreateNewPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := h.postService.CreateNewPost(r.Context(), title, content, imagePath, session.User.ID)
+	post := &domain.Post{
+		PostAuthor: session.User,
+		Title:      title,
+		Content:    content,
+	}
+	fmt.Printf("%v", post)
+
+	id, err := h.postService.CreateNewPost(r.Context(), post, imageData)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, err)
 		return
 	}
-
-	utils.WriteJSON(w, http.StatusCreated, map[string]interface{}{
-		"id": id,
-	})
+	http.Redirect(w, r, fmt.Sprintf("/post/%d", id), http.StatusSeeOther)
 }
 
 func (h *PostHandler) UploadImage(w http.ResponseWriter, r *http.Request) {

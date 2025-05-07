@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"go-hex-forum/internal/core/domain"
+	"time"
 )
 
 type PostRepository interface {
@@ -30,18 +31,21 @@ func NewPostService(postRepo PostRepository, imageStorage ImageStorage) *PostSer
 	}
 }
 
-func (s *PostService) CreateNewPost(ctx context.Context, title, content string, imagePath string, userID int64) (int64, error) {
-	if title == "" || content == "" {
+func (s *PostService) CreateNewPost(ctx context.Context, post *domain.Post, imageData []byte) (int64, error) {
+	if post.Title == "" || post.Content == "" {
 		return 0, errors.New("title and content are required")
 	}
+	post.CreatedAt = time.Now().UTC()
 
-	post := &domain.Post{
-		Title:     title,
-		Content:   content,
-		ImagePath: imagePath,
+	if len(imageData) > 0 {
+		url, err := s.imageStorage.UploadImage(ctx, post.PostAuthor.ID, imageData)
+		if err != nil {
+			return -1, err
+		}
+		post.ImagePath = url
 	}
 
-	return s.postRepo.SavePost(ctx, post, userID)
+	return s.postRepo.SavePost(ctx, post, post.PostAuthor.ID)
 }
 
 func (s *PostService) GetActivePosts(ctx context.Context) ([]domain.Post, error) {
@@ -52,8 +56,8 @@ func (s *PostService) GetActivePosts(ctx context.Context) ([]domain.Post, error)
 	return s.postRepo.GetActivePosts(ctx, pagination)
 }
 
-func (s *PostService) GetPostByID(ctx context.Context, postID int64) (domain.Post, error){
-	return s.postRepo.GetPostByID(ctx,postID)
+func (s *PostService) GetPostByID(ctx context.Context, postID int64) (domain.Post, error) {
+	return s.postRepo.GetPostByID(ctx, postID)
 }
 
 func (s *PostService) UploadImage(ctx context.Context, userID int64, imageData []byte) (string, error) {

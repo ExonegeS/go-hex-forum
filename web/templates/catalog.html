@@ -2,73 +2,135 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="referrer" content="no-referrer">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>1337b04rd</title>
+    <title>Catalog</title>
     <style>
-        /* Set the background color for the entire body */
         body {
-            background-color: #E6E9F5;
+            font-family: "Courier New", monospace;
+            background-color: #d6daf0;
+            color: #000;
             margin: 0;
-            font-family: Arial, sans-serif;
+            padding: 0;
         }
 
-        header, footer {
+        header {
             text-align: center;
-            padding: 10px 0;
+            background-color: #b7c0d8;
+            border-bottom: 2px solid #000;
+            padding: 20px 0;
         }
 
         nav a {
-            margin: 0 10px;
             text-decoration: none;
-            color: blue;
+            color: #000080;
+            margin: 0 5px;
         }
 
-        nav a:hover {
-            text-decoration: underline;
+        .user-info {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
         }
 
-        /* Styles for the grid layout */
+        .user-info img {
+            width: 40px; /* Фиксированный размер аватарки */
+            height: 40px;
+            border-radius: 50%;
+        }
+
+        main {
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+        }
+
         .posts .list {
             display: flex;
             flex-wrap: wrap;
             justify-content: center;
+            gap: 10px;
         }
 
         .post {
-            background-color: white;
+            background-color: #f9f9f9;
             border: 1px solid #ccc;
-            border-radius: 5px;
-            padding: 10px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-            text-align: center;
-            width: 15%;
-            margin: 10px;
+            padding: 8px;
+            width: 180px;
+            font-size: 12px;
+            text-align: left;
             display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin: 10px;
         }
 
         .post img {
             max-width: 100%;
             height: auto;
-            border-radius: 5px;
+            margin-bottom: 5px;
+        }
+
+        .post h3 {
+            font-size: 14px;
+            margin: 0;
+            word-wrap: break-word;
+            text-align: center;
+        }
+
+        .nickname-form input[type="text"] {
+            font-family: monospace;
+            padding: 2px 4px;
+            margin-top: 5px;
+        }
+
+        .nickname-form input[type="submit"] {
+            font-family: monospace;
+            padding: 2px 6px;
+            margin-top: 5px;
         }
     </style>
 </head>
 <body>
-{{ template "header" . }}
+<header>
+    <h1>Catalog</h1>
+    <nav>
+        [<a href="/create-post">Create post</a>] |
+        [<a href="/archive">Archive</a>]
+    </nav>
+
+    <div class="user-info">
+        {{if .Session.User.AvatarURL}}
+            <img src="{{.Session.User.AvatarURL}}" alt="avatar">
+        {{end}}
+        <span>Current nickname: <strong>{{.Session.User.Name}}</strong></span>
+    </div>
+
+    <form class="nickname-form" action="/api/username" method="POST">
+        Change nickname:
+        <input type="text" name="nickname" placeholder="Anonymous">
+        <input type="submit" value="Set">
+    </form>
+</header>
+
 <main>
     <section class="posts">
-        <ul class="list">
-            {{range .Posts}}
-                <li class="post">
-                    <a href="/post/{{.ID}}">
-                        <img src="{{ .ImagePath }}" alt="no pic">
-                        <h3>{{.Title}}</h3>
-                    </a>
-                </li>
-            {{end}}
-        </ul>
+      <ul class="list">
+        {{if gt (len .Posts) 0}}
+          {{range .Posts}}
+            <li class="post">
+              <a href="/post/{{.ID}}">
+                <img src="{{.ImagePath}}" alt="no pic">
+                <h3>{{.Title}}</h3>
+              </a>
+            </li>
+          {{end}}
+        {{else}}
+          <div class="no-posts">No posts yet</div>
+        {{end}}
+      </ul>
     </section>
-</main>
+  </main>
 </body>
 </html>

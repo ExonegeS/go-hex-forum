@@ -2,12 +2,10 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"go-hex-forum/internal/core/domain"
 	"go-hex-forum/internal/core/service"
-	"go-hex-forum/internal/ports/dto"
 	"go-hex-forum/internal/utils"
 	"log"
 	"net/http"
@@ -29,27 +27,29 @@ func NewSessionHandler(sessionService SessionService) SessionHandler {
 }
 
 func (s *SessionHandler) RegisterEndpoints(mux *http.ServeMux) {
-	mux.HandleFunc("POST /api/username", s.UpdateUserName)
+	mux.HandleFunc("POST /username", s.UpdateUserName)
 }
 
 func (s *SessionHandler) UpdateUserName(w http.ResponseWriter, r *http.Request) {
-	var req dto.UpdateUserNameRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, errors.New("invalid request body"))
-		return
+	err := r.ParseForm()
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, errors.New("could not parse form"))
 	}
+
+	newnickname := r.FormValue("nickname")
 
 	tokenCookie, ok := r.Context().Value("session_token").(string)
 	if !ok {
 		utils.WriteError(w, http.StatusUnauthorized, errors.New("unauthorized"))
 		return
 	}
-	fmt.Println(req)
-	err := s.SessionService.UpdateUserName(r.Context(), tokenCookie, req.UserName)
+
+	err = s.SessionService.UpdateUserName(r.Context(), tokenCookie, newnickname)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, fmt.Errorf("failed username change", err))
 		return
 	}
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func helloworld(w http.ResponseWriter, r *http.Request) {

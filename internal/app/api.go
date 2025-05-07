@@ -10,6 +10,7 @@ import (
 	"go-hex-forum/internal/core/service"
 	"go-hex-forum/internal/ports/http/handlers"
 	"go-hex-forum/internal/ports/http/middleware"
+	"html/template"
 	"log/slog"
 	"net/http"
 	"time"
@@ -19,42 +20,57 @@ type APIServer struct {
 	cfg    *config.Config
 	db     *sql.DB
 	logger *slog.Logger
+	tpl    *template.Template
 }
 
-func NewAPIServer(config *config.Config, db *sql.DB, logger *slog.Logger) *APIServer {
-	return &APIServer{config, db, logger}
+func NewAPIServer(config *config.Config, db *sql.DB, logger *slog.Logger, tpl *template.Template) *APIServer {
+	return &APIServer{config, db, logger, tpl}
 }
 
 func (s *APIServer) Run() error {
-	mux := http.NewServeMux()
+	frontendHandlers := http.NewServeMux()
+	apiHandlers := http.NewServeMux()
+	router := http.NewServeMux()
 
-	SessionsRepository := postgres.NewSessionRepository(s.db)
-	userdataProvider := rickmorty.NewUserDataProvider("https://rickandmortyapi.com/api", 826)
-	SessionService := service.NewSessionService(SessionsRepository, time.Now, userdataProvider, s.cfg.SessionConfig)
-	SessionHandler := handlers.NewSessionHandler(SessionService)
-	SessionHandler.RegisterEndpoints(mux)
+	router.Handle("/api/", http.StripPrefix("/api", apiHandlers))
+	router.Handle("/", frontendHandlers)
 
-	PostRepository := postgres.NewPostRepository(s.db)
+	//Third Party APIs
+	UserdataProvider := rickmorty.NewUserDataProvider("https://rickandmortyapi.com/api", 826)
 	ImageStorage := storage.NewImageStorage(s.cfg.Storage.MakeAddressString(), s.cfg.Storage.MaxNameLength)
+
+	// Session
+	SessionRepository := postgres.NewSessionRepository(s.db)
+	SessionService := service.NewSessionService(SessionRepository, time.Now, UserdataProvider, s.cfg.SessionConfig)
+	SessionHandler := handlers.NewSessionHandler(SessionService)
+	SessionHandler.RegisterEndpoints(apiHandlers)
+
+	// Post
+	PostRepository := postgres.NewPostRepository(s.db)
 	PostService := service.NewPostService(PostRepository, ImageStorage)
 	PostHandler := handlers.NewPostHandler(PostService)
-	PostHandler.RegisterEndpoints(mux)
+	PostHandler.RegisterEndpoints(apiHandlers)
 
-	frontendHandler, err := handlers.NewFrontendHandler(PostService, SessionService)
-	if err != nil {
-		return fmt.Errorf("failed to create frontend handler: %w", err)
-	}
-	frontendHandler.RegisterFrontendEndpoints(mux)
+	// Comment
+	CommentRepository := postgres.NewCommentRepository(s.db)
+	CommentService := service.NewCommentService(CommentRepository, PostRepository, ImageStorage)
+	CommentHandler := handlers.NewCommentHandler(CommentService)
+	CommentHandler.RegisterEndpoints(apiHandlers)
 
+	// rendering pages and calls on /api
+	frontendHandler := handlers.NewFrontendHandler(PostService, SessionService, CommentService, s.tpl)
+	frontendHandler.RegisterFrontendEndpoints(frontendHandlers)
+
+	// Middlewares
 	SessionMiddleware := SessionHandler.WithSessionToken(int64(s.cfg.SessionConfig.DefaultTTL.Seconds()))
-	timeoutMW := middleware.NewTimeoutContextMW(15)
-	MWChain := middleware.NewMiddlewareChain(timeoutMW, SessionMiddleware, SessionHandler.RequireValidSession)
+	TimeoutMW := middleware.NewTimeoutContextMW(15)
+	MWChain := middleware.NewMiddlewareChain(TimeoutMW, SessionMiddleware, SessionHandler.RequireValidSession)
 
 	serverAddress := fmt.Sprintf("%s:%s", s.cfg.Server.Address, s.cfg.Server.Port)
 	s.logger.Info("starting server", slog.String("host", serverAddress))
 	httpServer := http.Server{
 		Addr:    serverAddress,
-		Handler: MWChain(mux),
+		Handler: MWChain(router),
 	}
 	return httpServer.ListenAndServe()
 }

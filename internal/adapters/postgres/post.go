@@ -42,7 +42,7 @@ func (r *PostRepository) SavePost(ctx context.Context, post *domain.Post, userID
 
 func (r *PostRepository) GetActivePosts(ctx context.Context, pagination *domain.Pagination) ([]domain.Post, error) {
 	var posts []domain.Post
-	query := `SELECT p.id,u.id,u.name,COALESCE(u.avatar_url, '') AS avatar_url,p.title,p.content,COALESCE(p.image_path, '') AS image_path,p.is_archived 
+	query := `SELECT p.id,u.id,u.name,COALESCE(u.avatar_url, '') AS avatar_url,p.title,p.content,COALESCE(p.image_path, '') AS image_path,p.created_at,p.is_archived 
 	FROM posts p
 	JOIN users u ON u.id = p.user_id
 	WHERE p.is_archived = false
@@ -67,6 +67,7 @@ func (r *PostRepository) GetActivePosts(ctx context.Context, pagination *domain.
 			&post.Title,
 			&post.Content,
 			&post.ImagePath,
+			&post.CreatedAt,
 			&post.IsArchived,
 		)
 		if err != nil {
@@ -83,11 +84,21 @@ func (r *PostRepository) GetActivePosts(ctx context.Context, pagination *domain.
 func (r *PostRepository) GetPostByID(ctx context.Context, postID int64) (domain.Post, error) {
 	var post domain.Post
 
-	query := `SELECT p.id,u.id,u.name,COALESCE(u.avatar_url, '') AS avatar_url,p.title,p.content,COALESCE(p.image_path, '') AS image_path,p.is_archived 
-	FROM posts p
-	JOIN users u ON u.id = p.user_id
-	WHERE p.id = $1`
-
+	query := `
+    SELECT 
+        p.id,
+        u.id,
+        u.name,
+        COALESCE(u.avatar_url, '') AS avatar_url,
+        p.title,
+        p.content,
+        COALESCE(p.image_path, '') AS image_path,
+        p.created_at,
+        p.is_archived
+    FROM posts p
+    JOIN users u ON u.id = p.user_id
+    WHERE p.id = $1
+    `
 	err := r.db.QueryRowContext(ctx, query, postID).Scan(
 		&post.ID,
 		&post.PostAuthor.ID,
@@ -96,11 +107,11 @@ func (r *PostRepository) GetPostByID(ctx context.Context, postID int64) (domain.
 		&post.Title,
 		&post.Content,
 		&post.ImagePath,
+		&post.CreatedAt, // <-- здесь сканим created_at
 		&post.IsArchived,
 	)
-
 	if err != nil {
-		return post, err
+		return post, fmt.Errorf("GetPostByID: %w", err)
 	}
 	return post, nil
 }
