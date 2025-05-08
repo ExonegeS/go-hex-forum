@@ -35,7 +35,10 @@ func (s *APIServer) Run() error {
 	router.Handle("/api/", http.StripPrefix("/api", apiHandlers))
 	router.Handle("/", frontendHandlers)
 
-	//Third Party APIs
+	// Transactor
+	transactor := postgres.NewTransactor(s.db)
+
+	// Third Party APIs
 	UserdataProvider := rickmorty.NewUserDataProvider("https://rickandmortyapi.com/api", 826)
 	ImageStorage := storage.NewImageStorage(s.cfg.Storage.MakeAddressString(), s.cfg.Storage.MaxNameLength)
 
@@ -53,7 +56,7 @@ func (s *APIServer) Run() error {
 
 	// Comment
 	CommentRepository := postgres.NewCommentRepository(s.db)
-	CommentService := service.NewCommentService(CommentRepository, PostRepository, ImageStorage)
+	CommentService := service.NewCommentService(transactor, CommentRepository, PostRepository, ImageStorage)
 	CommentHandler := handlers.NewCommentHandler(CommentService)
 	CommentHandler.RegisterEndpoints(apiHandlers)
 

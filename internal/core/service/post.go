@@ -12,6 +12,7 @@ type PostRepository interface {
 	SavePost(ctx context.Context, post *domain.Post, userID int64) (int64, error)
 	GetActivePosts(ctx context.Context, pagination *domain.Pagination) ([]domain.Post, error)
 	GetPostByID(ctx context.Context, postID int64) (domain.Post, error)
+	// UpdateExpiresAt(ctx context.Context, postID int64, timeInSec time.Duration) error
 }
 
 type ImageStorage interface {
@@ -33,10 +34,10 @@ func NewPostService(postRepo PostRepository, imageStorage ImageStorage) *PostSer
 
 func (s *PostService) CreateNewPost(ctx context.Context, post *domain.Post, imageData []byte) (int64, error) {
 	if post.Title == "" || post.Content == "" {
-		return 0, errors.New("title and content are required")
+		return -1, errors.New("title and content are required")
 	}
 	post.CreatedAt = time.Now().UTC()
-
+	post.ExpiresAt = time.Now().UTC().Add(10 * time.Second)
 	if len(imageData) > 0 {
 		url, err := s.imageStorage.UploadImage(ctx, post.PostAuthor.ID, imageData)
 		if err != nil {
@@ -57,6 +58,8 @@ func (s *PostService) GetActivePosts(ctx context.Context) ([]domain.Post, error)
 }
 
 func (s *PostService) GetPostByID(ctx context.Context, postID int64) (domain.Post, error) {
+	// post, err :=
+	// fmt.Println(post, err)
 	return s.postRepo.GetPostByID(ctx, postID)
 }
 

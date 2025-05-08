@@ -30,7 +30,7 @@ func (h *PostHandler) RegisterEndpoints(mux *http.ServeMux) {
 }
 
 func (h *PostHandler) CreateNewPost(w http.ResponseWriter, r *http.Request) {
-	err := r.ParseMultipartForm(10 << 20) // 10 MB
+	err := r.ParseMultipartForm(10 << 20)
 	if err != nil {
 		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("failed to parse form: %w", err))
 		return

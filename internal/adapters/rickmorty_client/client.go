@@ -12,6 +12,14 @@ import (
 	"go-hex-forum/internal/core/domain"
 )
 
+/*
+
+ты тут?
+я через 10 минут приду, пока посмотри как инет работает. мне кажется лагает
+19:24 только подошел  Ты тут? Ща с телефона буду разлавать можно и дс
+
+*/
+
 type UserDataProvider struct {
 	baseURL         string
 	client          *http.Client

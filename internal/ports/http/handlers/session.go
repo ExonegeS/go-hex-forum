@@ -114,7 +114,7 @@ func (s *SessionHandler) RequireValidSession(next http.Handler) http.Handler {
 			log.Print(err.Error())
 			return
 		}
-		fmt.Println("Session  here:", session)
+		// fmt.Println("Session  here:", session)
 		ctx := context.WithValue(r.Context(), "session", session)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})

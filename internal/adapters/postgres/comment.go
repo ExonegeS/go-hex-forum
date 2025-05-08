@@ -8,11 +8,11 @@ import (
 )
 
 type CommentRepository struct {
-	db *sql.DB
+	br BaseRepository
 }
 
 func NewCommentRepository(db *sql.DB) *CommentRepository {
-	return &CommentRepository{db}
+	return &CommentRepository{BaseRepository{db}}
 }
 
 func (r *CommentRepository) SaveComment(ctx context.Context, comment *domain.Comment) (int64, error) {
@@ -29,7 +29,7 @@ func (r *CommentRepository) SaveComment(ctx context.Context, comment *domain.Com
 	}
 
 	var id int64
-	err := r.db.QueryRowContext(ctx, query,
+	err := r.br.queryRowContext(ctx, query,
 		comment.PostID,
 		comment.Author.ID,
 		comment.Content,
@@ -54,7 +54,7 @@ func (r *CommentRepository) GetByPostID(ctx context.Context, postID int64) ([]*d
         ORDER BY c.created_at ASC
     `
 
-	rows, err := r.db.QueryContext(ctx, query, postID)
+	rows, err := r.br.queryContext(ctx, query, postID)
 	if err != nil {
 		return nil, fmt.Errorf("querying comments: %w", err)
 	}

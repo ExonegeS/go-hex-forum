@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"go-hex-forum/internal/core/domain"
+	"time"
 )
 
 type CommentRepository interface {
@@ -23,15 +25,24 @@ type CommentRepository interface {
 	// GetLastCommentTimeForPost(ctx context.Context, postID string) (time.Time, error)
 }
 
+// type IPostExpire interface // get post | update post expire at
+
+type CommentPostRepo interface {
+	GetPostByID(ctx context.Context, postID int64) (domain.Post, error)
+	UpdateExpiresAt(ctx context.Context, postID int64, timeInSec time.Time) error
+}
+
 type CommentService struct {
+	transactor   Transactor
 	commentRepo  CommentRepository
-	postRepo     PostRepository
+	postRepo     CommentPostRepo
 	imageStorage ImageStorage
 }
 
-func NewCommentService(cr CommentRepository, pr PostRepository,
+func NewCommentService(tr Transactor, cr CommentRepository, pr CommentPostRepo,
 	is ImageStorage) *CommentService {
 	return &CommentService{
+		transactor:   tr,
 		commentRepo:  cr,
 		postRepo:     pr,
 		imageStorage: is,
@@ -39,6 +50,13 @@ func NewCommentService(cr CommentRepository, pr PostRepository,
 }
 
 func (s *CommentService) SaveComment(ctx context.Context, comment *domain.Comment, imageData []byte) (int64, error) {
+	post, err := s.postRepo.GetPostByID(ctx, comment.PostID)
+	if err != nil {
+		return -1, fmt.Errorf("post not found: %w", err)
+	}
+	if post.IsArchived {
+		return -1, fmt.Errorf("post is archived, new comments are prohibited")
+	}
 	if len(imageData) > 0 {
 		url, err := s.imageStorage.UploadImage(ctx, comment.Author.ID, imageData)
 		if err != nil {
@@ -46,7 +64,22 @@ func (s *CommentService) SaveComment(ctx context.Context, comment *domain.Commen
 		}
 		comment.ImagePath = url
 	}
-	return s.commentRepo.SaveComment(ctx, comment)
+	var id int64 = -1
+	err = s.transactor.WithinTransaction(ctx, func(txCtx context.Context) error {
+		if id, err = s.commentRepo.SaveComment(txCtx, comment); err != nil {
+			return fmt.Errorf("failed to save comment: %w", err)
+		}
+
+		if err := s.postRepo.UpdateExpiresAt(txCtx, comment.PostID, time.Now().Add(10*time.Minute)); err != nil {
+			return fmt.Errorf("failed to update post: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return -1, err
+	}
+	return id, nil
 }
 
 func (s *CommentService) GetByPostID(ctx context.Context, postID int64) ([]*domain.Comment, error) {

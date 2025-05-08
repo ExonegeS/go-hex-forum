@@ -64,7 +64,7 @@ func (h *PrettyHandler) Handle(_ context.Context, r slog.Record) error {
 		}
 	}
 
-	timeStr := r.Time.Format("[15:05:05.000]")
+	timeStr := r.Time.Format("[15:04:05.000]")
 	msg := "\033[36m" + (r.Message) + "\033[0m"
 
 	h.l.Println(
