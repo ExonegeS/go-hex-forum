@@ -82,6 +82,47 @@ func (r *PostRepository) GetActivePosts(ctx context.Context, pagination *domain.
 	return posts, nil
 }
 
+func (r *PostRepository) GetArchivedPosts(ctx context.Context, pagination *domain.Pagination) ([]domain.Post, error) {
+	var posts []domain.Post
+	query := `SELECT p.id,u.id,u.name,COALESCE(u.avatar_url, '') AS avatar_url,p.title,p.content,COALESCE(p.image_path, '') AS image_path,p.created_at,p.is_archived 
+	FROM posts p
+	JOIN users u ON u.id = p.user_id
+	WHERE p.is_archived = true
+	ORDER BY p.created_at DESC
+	LIMIT $1 OFFSET $2`
+
+	offset := (pagination.Page - 1) * pagination.PageSize
+
+	rows, err := r.br.queryContext(ctx, query, pagination.PageSize, offset)
+	if err != nil {
+		return posts, fmt.Errorf("failed to query active posts: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var post domain.Post
+		err := rows.Scan(
+			&post.ID,
+			&post.PostAuthor.ID,
+			&post.PostAuthor.Name,
+			&post.PostAuthor.AvatarURL,
+			&post.Title,
+			&post.Content,
+			&post.ImagePath,
+			&post.CreatedAt,
+			&post.IsArchived,
+		)
+		if err != nil {
+			return posts, fmt.Errorf("failed to query active posts: %w", err)
+		}
+		posts = append(posts, post)
+	}
+	if err := rows.Err(); err != nil {
+		return posts, fmt.Errorf("failed to query active posts: %w", err)
+	}
+	return posts, nil
+}
+
 func (r *PostRepository) GetPostByID(ctx context.Context, postID int64) (domain.Post, error) {
 	var post domain.Post
 
@@ -129,6 +170,19 @@ func (r *PostRepository) UpdateExpiresAt(ctx context.Context, postID int64, date
 	_, err := r.br.execContext(ctx, query, date, postID)
 	if err != nil {
 		return fmt.Errorf("UpdateExpiresAt: %w", err)
+	}
+	return nil
+}
+
+func (r *PostRepository) ArchiveExpiredPosts(ctx context.Context) error {
+	query := `UPDATE posts
+	SET is_archived=true
+	WHERE expires_at <= NOW() AND is_archived=false
+	`
+
+	_, err := r.br.execContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to archieve expired posts: %w", err)
 	}
 	return nil
 }

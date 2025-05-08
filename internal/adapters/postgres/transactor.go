@@ -63,4 +63,3 @@ func (r *BaseRepository) queryRowContext(ctx context.Context, query string, args
 	}
 	return r.db.QueryRowContext(ctx, query, args...)
 }
-

@@ -39,18 +39,10 @@ func (h *FrontendHandler) RegisterFrontendEndpoints(mux *http.ServeMux) {
 	mux.HandleFunc("GET /post/{id}", h.ShowPost)
 	// mux.HandleFunc("POST /post", h.CreatePost)
 	// mux.HandleFunc("GET /upload", h.ShowUploadForm)
+	mux.HandleFunc("GET /archive", h.ShowArchive)
 }
 
 func (h *FrontendHandler) ShowIndex(w http.ResponseWriter, r *http.Request) {
-	// ctx := r.Context()
-
-	// Get active posts
-	// posts, err := h.postService.GetActivePosts(ctx)
-	// if err != nil {
-	// 	http.Error(w, "Error loading posts", http.StatusInternalServerError)
-	// 	return
-	// }
-
 	posts, err := h.postService.GetActivePosts(r.Context())
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, err)
@@ -62,6 +54,26 @@ func (h *FrontendHandler) ShowIndex(w http.ResponseWriter, r *http.Request) {
 	fmt.Println(session)
 
 	h.renderTemplate(w, "catalog.html", struct {
+		Session *domain.Session
+		Posts   []domain.Post
+	}{
+		Session: session,
+		Posts:   posts,
+	})
+}
+
+func (h *FrontendHandler) ShowArchive(w http.ResponseWriter, r *http.Request) {
+	posts, err := h.postService.GetArchivedPosts(r.Context())
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err)
+	}
+
+	// Get session from context
+	session, _ := r.Context().Value("session").(*domain.Session)
+
+	fmt.Println(session)
+
+	h.renderTemplate(w, "archive.html", struct {
 		Session *domain.Session
 		Posts   []domain.Post
 	}{

@@ -70,7 +70,7 @@ func (s *CommentService) SaveComment(ctx context.Context, comment *domain.Commen
 			return fmt.Errorf("failed to save comment: %w", err)
 		}
 
-		if err := s.postRepo.UpdateExpiresAt(txCtx, comment.PostID, time.Now().Add(10*time.Minute)); err != nil {
+		if err := s.postRepo.UpdateExpiresAt(txCtx, comment.PostID, time.Now().Add(15*time.Minute)); err != nil {
 			return fmt.Errorf("failed to update post: %w", err)
 		}
 

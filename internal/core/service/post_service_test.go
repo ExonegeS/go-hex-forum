@@ -15,6 +15,9 @@ func TestCreatePost_Success(t *testing.T) {
 		getFunc: func(ctx context.Context, postID int64) (domain.Post, error) {
 			return domain.Post{ID: 1}, nil
 		},
+		archieveExpiredfunc: func(ctx context.Context) error {
+			return nil
+		},
 	}
 	imageMock := &mockImageStorage{
 		uploadFunc: func(ctx context.Context, userID int64, data []byte) (publicURL string, err error) {

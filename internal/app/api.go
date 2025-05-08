@@ -1,6 +1,7 @@
 package apiserver
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"go-hex-forum/config"
@@ -28,6 +29,8 @@ func NewAPIServer(config *config.Config, db *sql.DB, logger *slog.Logger, tpl *t
 }
 
 func (s *APIServer) Run() error {
+	ctx := context.Background()
+
 	frontendHandlers := http.NewServeMux()
 	apiHandlers := http.NewServeMux()
 	router := http.NewServeMux()
@@ -51,6 +54,8 @@ func (s *APIServer) Run() error {
 	// Post
 	PostRepository := postgres.NewPostRepository(s.db)
 	PostService := service.NewPostService(PostRepository, ImageStorage)
+
+	go PostService.ArchiveExpiredPostsWorker(ctx)
 	PostHandler := handlers.NewPostHandler(PostService)
 	PostHandler.RegisterEndpoints(apiHandlers)
 

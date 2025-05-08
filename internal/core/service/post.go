@@ -11,8 +11,10 @@ import (
 type PostRepository interface {
 	SavePost(ctx context.Context, post *domain.Post, userID int64) (int64, error)
 	GetActivePosts(ctx context.Context, pagination *domain.Pagination) ([]domain.Post, error)
+	GetArchivedPosts(ctx context.Context, pagination *domain.Pagination) ([]domain.Post, error)
 	GetPostByID(ctx context.Context, postID int64) (domain.Post, error)
 	// UpdateExpiresAt(ctx context.Context, postID int64, timeInSec time.Duration) error
+	ArchiveExpiredPosts(ctx context.Context) error
 }
 
 type ImageStorage interface {
@@ -37,7 +39,7 @@ func (s *PostService) CreateNewPost(ctx context.Context, post *domain.Post, imag
 		return -1, errors.New("title and content are required")
 	}
 	post.CreatedAt = time.Now().UTC()
-	post.ExpiresAt = time.Now().UTC().Add(10 * time.Second)
+	post.ExpiresAt = time.Now().UTC().Add(10 * time.Minute)
 	if len(imageData) > 0 {
 		url, err := s.imageStorage.UploadImage(ctx, post.PostAuthor.ID, imageData)
 		if err != nil {
@@ -56,10 +58,15 @@ func (s *PostService) GetActivePosts(ctx context.Context) ([]domain.Post, error)
 	}
 	return s.postRepo.GetActivePosts(ctx, pagination)
 }
+func (s *PostService) GetArchivedPosts(ctx context.Context) ([]domain.Post, error) {
+	pagination := &domain.Pagination{
+		Page:     1,
+		PageSize: 10,
+	}
+	return s.postRepo.GetArchivedPosts(ctx, pagination)
+}
 
 func (s *PostService) GetPostByID(ctx context.Context, postID int64) (domain.Post, error) {
-	// post, err :=
-	// fmt.Println(post, err)
 	return s.postRepo.GetPostByID(ctx, postID)
 }
 
@@ -69,4 +76,26 @@ func (s *PostService) UploadImage(ctx context.Context, userID int64, imageData [
 		return "", fmt.Errorf("failed to upload image: %w", err)
 	}
 	return publicURL, nil
+}
+
+func (s *PostService) ArchiveExpiredPostsWorker(ctx context.Context) {
+	ticker := time.NewTicker(time.Minute)
+	fmt.Print("not tick yet")
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				err := s.postRepo.ArchiveExpiredPosts(ctx)
+				if err != nil {
+					fmt.Println("error bratha", err)
+					return
+				}
+				fmt.Print("tick!")
+			case <-ctx.Done():
+				ticker.Stop()
+				fmt.Print("tick stop")
+				return
+			}
+		}
+	}()
 }

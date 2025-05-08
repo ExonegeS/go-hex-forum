@@ -16,9 +16,10 @@ func (m *mockTransactor) WithinTransaction(ctx context.Context, fn func(ctx cont
 }
 
 type mockPostRepository struct {
-	saveFunc         func(ctx context.Context, post *domain.Post, userID int64) (int64, error)
-	getFunc          func(ctx context.Context, postID int64) (domain.Post, error)
-	updateExpireFunc func(ctx context.Context, postID int64, expire_at time.Time) error
+	saveFunc            func(ctx context.Context, post *domain.Post, userID int64) (int64, error)
+	getFunc             func(ctx context.Context, postID int64) (domain.Post, error)
+	updateExpireFunc    func(ctx context.Context, postID int64, expire_at time.Time) error
+	archieveExpiredfunc func(ctx context.Context) error
 }
 
 func (m *mockPostRepository) SavePost(ctx context.Context, post *domain.Post, userID int64) (int64, error) {
@@ -30,6 +31,11 @@ func (m *mockPostRepository) SavePost(ctx context.Context, post *domain.Post, us
 func (m *mockPostRepository) GetActivePosts(ctx context.Context, pagination *domain.Pagination) ([]domain.Post, error) {
 	return []domain.Post{}, nil
 }
+
+func (m *mockPostRepository) GetArchivedPosts(ctx context.Context, pagination *domain.Pagination) ([]domain.Post, error) {
+	return []domain.Post{}, nil
+}
+
 func (m *mockPostRepository) GetPostByID(ctx context.Context, postID int64) (domain.Post, error) {
 	if m.getFunc != nil {
 		return m.getFunc(ctx, postID)
@@ -40,6 +46,10 @@ func (m *mockPostRepository) UpdateExpiresAt(ctx context.Context, postID int64, 
 	if m.updateExpireFunc != nil {
 		return m.updateExpireFunc(ctx, postID, expires_at)
 	}
+	return nil
+}
+
+func (m *mockPostRepository) ArchiveExpiredPosts(ctx context.Context) error {
 	return nil
 }
 

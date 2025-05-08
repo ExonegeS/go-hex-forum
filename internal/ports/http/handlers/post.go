@@ -12,6 +12,7 @@ import (
 type PostService interface {
 	CreateNewPost(ctx context.Context, post *domain.Post, imageData []byte) (int64, error)
 	GetActivePosts(context.Context) ([]domain.Post, error)
+	GetArchivedPosts(context.Context) ([]domain.Post, error)
 	GetPostByID(ctx context.Context, postID int64) (domain.Post, error)
 	UploadImage(ctx context.Context, userID int64, imageData []byte) (string, error)
 }
