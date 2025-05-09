@@ -96,8 +96,8 @@
 <header>
     <h1>Archive</h1>
     <nav>
-        [<a href="/create-post">Create post</a>] |
         [<a href="/catalog">Catalog</a>]
+        [<a href="/create-post">New post</a>] |
     </nav>
     <div class="user-info">
         {{if .Session.User.AvatarURL}}
@@ -119,7 +119,7 @@
         {{if gt (len .Posts) 0}}
           {{range .Posts}}
             <li class="post">
-              <a href="/archive-post/{{.ID}}">
+              <a href="/post/{{.ID}}">
                 <img src="{{.ImagePath}}" alt="no pic">
                 <h3>{{.Title}}</h3>
               </a>

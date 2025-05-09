@@ -96,8 +96,8 @@
 <header>
     <h1>Catalog</h1>
     <nav>
-        [<a href="/create-post">Create post</a>] |
         [<a href="/archive">Archive</a>]
+        [<a href="/create-post">New post</a>] |
     </nav>
 
     <div class="user-info">
@@ -110,6 +110,7 @@
     <form class="nickname-form" action="/api/username" method="POST">
         Change nickname:
         <input type="text" name="nickname" placeholder="Anonymous">
+        <input type="hidden" name="source" value="frontend">
         <input type="submit" value="Set">
     </form>
 </header>

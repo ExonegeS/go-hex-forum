@@ -1,50 +1,159 @@
-<!-- templates/archive-post.html -->
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>{{.Post.Title}} (Archived)</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} (Archived)</title>
     <style>
-        .comment {
-            border: 1px solid #ccc;
-            padding: 10px;
+        body {
+            font-family: "Courier New", monospace;
+            background-color: #d6daf0;
+            color: #000;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            text-align: center;
+            background-color: #b7c0d8;
+            border-bottom: 2px solid #000;
+            padding: 20px 0;
+        }
+        .board-title { font-size: 2em; font-weight: bold; margin: 0; }
+        nav { margin-top: 10px; }
+        nav a { color: #000080; text-decoration: none; margin: 0 10px; font-size: 0.9em; }
+        nav a:hover { text-decoration: underline; }
+        main { max-width: 800px; margin: 20px auto; padding: 0 10px; }
+        .post, .comment {
+            background-color: #f0f4ff;
+            border: 2px solid #000;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .post-header, .comment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #000;
+            padding-bottom: 5px;
+        }
+        .post-header .title { font-size: 1.2em; font-weight: bold; }
+        .post-header .meta, .comment-header .meta { font-size: 0.85em; color: #333; }
+        .user-line {
+            display: flex;
+            align-items: center;
+            gap: 8px;
             margin: 10px 0;
         }
-        .comment img.avatar {
-            width: 50px;
-            vertical-align: middle;
+        .user-line img {
+            width: 32px; height: 32px;
+            border-radius: 50%; border: 1px solid #000;
         }
-        .comment-content {
-            display: inline-block;
-            vertical-align: middle;
-            margin-left: 10px;
+        .user-line .name { font-weight: bold; }
+        .content-wrapper {
+            display: flex;
+            gap: 15px;
+            margin-top: 10px;
         }
+        .content-wrapper .post-image, .content-wrapper .comment-image {
+            flex-shrink: 0;
+        }
+        .post-image img, .comment-image img {
+            max-width: 150px; max-height: 150px;
+            border: 1px solid #999;
+        }
+        .text-block {
+            flex-grow: 1;
+        }
+        .file-info { font-size: 0.8em; color: #666; margin-top: 3px; }
+        blockquote {
+            margin: 0; padding: 10px;
+            background: #e0e4ff;
+            border-left: 4px solid #000;
+        }
+        .add-comment {
+            border-top: 2px solid #000;
+            padding-top: 15px;
+            margin-top: 30px;
+        }
+        .comment-form textarea {
+            width: 100%; height: 100px;
+            border: 2px solid #000;
+            font-family: inherit; padding: 5px;
+        }
+        .comment-form input[type="file"] { margin: 10px 0; }
+        .comment-form input[type="submit"] {
+            background-color: #d0d0d0;
+            border: 2px solid #000;
+            padding: 6px 20px;
+            font-weight: bold; cursor: pointer;
+        }
+        .comment-form input[type="submit"]:hover { background-color: #c0c4d8; }
     </style>
 </head>
 <body>
-<a href="/archive">Back to Archive</a>
-<h1>{{.Post.Title}} (Archived)</h1>
-<p>{{.Post.Content}}</p>
-{{if .Post.ImageURL}}
-<img src="{{.Post.ImageURL}}" alt="Post Image">
-{{end}}
-<p>Post ID: {{.Post.ID}}</p>
-<h2>Comments</h2>
-<div class="comments">
-    {{range .Comments}}
-    <div class="comment">
-        <img class="avatar" src="{{.AvatarURL}}" alt="User Avatar">
-        <div class="comment-content">
-            <p><strong>Comment ID:</strong> {{.ID}}</p>
-            {{if .ReplyToID}}
-            <p><em>Reply to ID: {{.ReplyToID}}</em></p>
+<header>
+    <div class="board-title">1337b0ard</div>
+    <nav>
+        [<a href="/catalog">Catalog</a>] |
+        [<a href="/archive">Archive</a>] |
+        [<a href="/create-post">New Post</a>]
+    </nav>
+</header>
+<main>
+    <!-- Main Post -->
+    <div class="post">
+        <div class="post-header">
+            <div class="title">{{.Title}}</div>
+            <div class="meta">Created: {{formatTime .DataTime}}</div>
+        </div>
+        <div class="user-line">
+            {{if .UserAvatar}}<img src="{{.UserAvatar}}" alt="avatar">{{end}}
+            <span class="name">{{.UserName}}</span>
+        </div>
+        <div class="content-wrapper">
+            {{if .ImagePath}}
+            <div class="post-image">
+                <a href="{{.ImagePath}}"><img src="{{.ImagePath}}" alt="Post image"></a>
+                <div class="file-info"><a href="{{.ImagePath}}"></a></div>
+            </div>
             {{end}}
-            <p>{{.Content}}</p>
+            <div class="text-block">
+                <blockquote>{{.Content}}</blockquote>
+            </div>
         </div>
     </div>
-    {{else}}
-    <p>No comments available.</p>
-    {{end}}
-</div>
-<!-- Comment form is omitted since adding new comments is not allowed -->
+    <!-- Comments -->
+    <div class="comments">
+        <div class="comment-header">
+            <div>Replies ({{len .Comments}})</div>
+            <div></div>
+        </div>
+        {{if .Comments}}
+            {{range .Comments}}
+            <div class="comment">
+                <div class="comment-header">
+                    <div class="user-line">
+                        {{if .Author.AvatarURL}}<img src="{{.Author.AvatarURL}}" alt="avatar">{{end}}
+                        <span class="name">{{.Author.Name}}</span>
+                    </div>
+                    <div class="meta">{{formatTime .CreatedAt}}</div>
+                </div>
+                <div class="content-wrapper">
+                    {{if .ImagePath}}
+                    <div class="comment-image">
+                        <a href="{{.ImagePath}}"><img src="{{.ImagePath}}" alt="Comment image"></a>
+                    </div>
+                    {{end}}
+                    <div class="text-block">
+                        <blockquote>{{.Content}}</blockquote>
+                    </div>
+                </div>
+            </div>
+            {{end}}
+        {{else}}
+            <div class="no-comments">No comments yet</div>
+        {{end}}
+    </div>
+</main>
 </body>
 </html>

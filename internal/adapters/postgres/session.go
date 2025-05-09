@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"go-hex-forum/internal/core/domain"
+	"go-hex-forum/internal/core/service"
 	"time"
 )
 
@@ -18,34 +19,35 @@ func NewSessionRepository(db *sql.DB) *SessionRepository {
 }
 
 func (r *SessionRepository) Store(ctx context.Context, session domain.Session) error {
+	const op = "SessionRepository.Store"
+
 	return runInTx(r.db, func(tx *sql.Tx) error {
 		userStmt, err := tx.PrepareContext(ctx, `
-            INSERT INTO users(name, avatar_url)
-            VALUES($1, $2)
-            RETURNING id
-        `)
+			INSERT INTO users(name, avatar_url)
+			VALUES($1, $2)
+			RETURNING id
+		`)
 		if err != nil {
-			return fmt.Errorf("user prepare error: %w", err)
+			return fmt.Errorf("%s: prepare user insert: %w", op, err)
 		}
 		defer userStmt.Close()
 
 		var userID int64
 		err = userStmt.QueryRowContext(ctx, session.User.Name, session.User.AvatarURL).Scan(&userID)
 		if err != nil {
-			return fmt.Errorf("user insert error: %w", err)
+			return fmt.Errorf("%s: user insert: %w", op, err)
 		}
 
-		// 2. Вставка сессии
 		sessionStmt, err := tx.PrepareContext(ctx, `
-            INSERT INTO sessions(
-                session_hash, 
-                user_id, 
-                created_at, 
-                expires_at
-            ) VALUES($1, $2, $3, $4)
-        `)
+			INSERT INTO sessions(
+				session_hash, 
+				user_id, 
+				created_at, 
+				expires_at
+			) VALUES($1, $2, $3, $4)
+		`)
 		if err != nil {
-			return fmt.Errorf("session prepare error: %w", err)
+			return fmt.Errorf("%s: prepare session insert: %w", op, err)
 		}
 		defer sessionStmt.Close()
 
@@ -56,7 +58,7 @@ func (r *SessionRepository) Store(ctx context.Context, session domain.Session) e
 			session.ExpiresAt,
 		)
 		if err != nil {
-			return fmt.Errorf("session insert error: %w", err)
+			return fmt.Errorf("%s: session insert: %w", op, err)
 		}
 
 		return nil
@@ -64,19 +66,21 @@ func (r *SessionRepository) Store(ctx context.Context, session domain.Session) e
 }
 
 func (r *SessionRepository) GetByHashedToken(ctx context.Context, hashedToken string) (*domain.Session, error) {
+	const op = "SessionRepository.GetByHashedToken"
+
 	query := `
-        SELECT 
-            s.id, 
-            s.session_hash, 
-            s.created_at, 
-            s.expires_at,
-            u.id AS user_id,
-            u.name,
-            u.avatar_url
-        FROM sessions s
-        JOIN users u ON s.user_id = u.id
-        WHERE s.session_hash = $1
-    `
+		SELECT 
+			s.id, 
+			s.session_hash, 
+			s.created_at, 
+			s.expires_at,
+			u.id AS user_id,
+			u.name,
+			u.avatar_url
+		FROM sessions s
+		JOIN users u ON s.user_id = u.id
+		WHERE s.session_hash = $1
+	`
 
 	var session domain.Session
 	err := r.db.QueryRowContext(ctx, query, hashedToken).Scan(
@@ -90,7 +94,10 @@ func (r *SessionRepository) GetByHashedToken(ctx context.Context, hashedToken st
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("session get error: %w", err)
+		if err == sql.ErrNoRows {
+			return nil, service.ErrSessionNotFound
+		}
+		return nil, fmt.Errorf("%s: session get: %w", op, err)
 	}
 
 	return &session, nil
@@ -98,17 +105,18 @@ func (r *SessionRepository) GetByHashedToken(ctx context.Context, hashedToken st
 
 func (r *SessionRepository) UpdateByToken(ctx context.Context, hashedToken string, updateFn func(*domain.Session) (bool, error)) error {
 	const op = "SessionRepository.UpdateByToken"
+
 	return runInTx(r.db, func(tx *sql.Tx) error {
 		query := `SELECT
-            s.id,
-            s.session_hash,
-            s.expires_at,
-            u.id AS user_id,
-            u.name,
-            u.avatar_url
-        FROM sessions s
-        JOIN users u ON s.user_id = u.id
-        WHERE s.session_hash = $1 FOR UPDATE`
+			s.id,
+			s.session_hash,
+			s.expires_at,
+			u.id AS user_id,
+			u.name,
+			u.avatar_url
+		FROM sessions s
+		JOIN users u ON s.user_id = u.id
+		WHERE s.session_hash = $1 FOR UPDATE`
 
 		var (
 			id            int64
@@ -120,7 +128,7 @@ func (r *SessionRepository) UpdateByToken(ctx context.Context, hashedToken strin
 		)
 		err := tx.QueryRowContext(ctx, query, hashedToken).Scan(&id, &tokenHash, &expiresAt, &userId, &userName, &userAvatarURL)
 		if err != nil {
-			return fmt.Errorf("session get error: %w", err)
+			return fmt.Errorf("%s: session get: %w", op, err)
 		}
 
 		session := &domain.Session{
@@ -136,7 +144,7 @@ func (r *SessionRepository) UpdateByToken(ctx context.Context, hashedToken strin
 
 		updated, err := updateFn(session)
 		if err != nil {
-			return err
+			return fmt.Errorf("%s: updateFn: %w", op, err)
 		}
 
 		if !updated {
@@ -147,14 +155,14 @@ func (r *SessionRepository) UpdateByToken(ctx context.Context, hashedToken strin
 			"UPDATE sessions SET expires_at = $1 WHERE session_hash = $2",
 			session.ExpiresAt, session.TokenHash)
 		if err != nil {
-			return fmt.Errorf("%s: %w", op, err)
+			return fmt.Errorf("%s: update session: %w", op, err)
 		}
 
 		_, err = tx.ExecContext(ctx,
 			"UPDATE users SET name = $1, avatar_url = $2 WHERE id = $3",
 			session.User.Name, session.User.AvatarURL, session.User.ID)
 		if err != nil {
-			return fmt.Errorf("%s: %w", op, err)
+			return fmt.Errorf("%s: update user: %w", op, err)
 		}
 
 		return nil
@@ -162,23 +170,24 @@ func (r *SessionRepository) UpdateByToken(ctx context.Context, hashedToken strin
 }
 
 func runInTx(db *sql.DB, fn func(tx *sql.Tx) error) error {
+	const op = "SessionRepository.runInTx"
+
 	tx, err := db.Begin()
 	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
+		return fmt.Errorf("%s: begin transaction: %w", op, err)
 	}
 
 	err = fn(tx)
 	if err == nil {
 		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("failed to commit transaction: %w", err)
+			return fmt.Errorf("%s: commit transaction: %w", op, err)
 		}
 		return nil
 	}
 
-	rollbackErr := tx.Rollback()
-	if rollbackErr != nil {
-		return errors.Join(err, rollbackErr)
+	if rollbackErr := tx.Rollback(); rollbackErr != nil {
+		return errors.Join(fmt.Errorf("%s: fn failed: %w", op, err), fmt.Errorf("%s: rollback failed: %w", op, rollbackErr))
 	}
 
-	return err
+	return fmt.Errorf("%s: fn failed: %w", op, err)
 }

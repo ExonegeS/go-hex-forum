@@ -3,33 +3,23 @@ package service
 import (
 	"context"
 	"fmt"
-	"go-hex-forum/internal/core/domain"
 	"time"
+
+	"go-hex-forum/internal/core/domain"
+	"go-hex-forum/pkg/svcerr"
 )
 
+// Transactor abstracts transactional execution
+// ImageStorage uploads images and returns public URLs
+
 type CommentRepository interface {
-	// Основные CRUD операции
 	SaveComment(ctx context.Context, comment *domain.Comment) (int64, error)
-	// GetByID(ctx context.Context, id int64) (*domain.Comment, error)
 	GetByPostID(ctx context.Context, postID int64) ([]*domain.Comment, error)
-
-	// // Для управления жизненным циклом
-	// DeleteCommentsForPost(ctx context.Context, postID string) error
-	// UpdateCommentContent(ctx context.Context, id, newContent string) error
-
-	// // Для связей между комментариями
-	// GetReplies(ctx context.Context, parentID string) ([]domain.Comment, error)
-	// GetThread(ctx context.Context, rootID string) ([]domain.Comment, error)
-
-	// // Для обновления времени поста
-	// GetLastCommentTimeForPost(ctx context.Context, postID string) (time.Time, error)
 }
-
-// type IPostExpire interface // get post | update post expire at
 
 type CommentPostRepo interface {
 	GetPostByID(ctx context.Context, postID int64) (domain.Post, error)
-	UpdateExpiresAt(ctx context.Context, postID int64, timeInSec time.Time) error
+	UpdateExpiresAt(ctx context.Context, postID int64, expiresAt time.Time) error
 }
 
 type CommentService struct {
@@ -39,39 +29,52 @@ type CommentService struct {
 	imageStorage ImageStorage
 }
 
-func NewCommentService(tr Transactor, cr CommentRepository, pr CommentPostRepo,
-	is ImageStorage) *CommentService {
-	return &CommentService{
-		transactor:   tr,
-		commentRepo:  cr,
-		postRepo:     pr,
-		imageStorage: is,
-	}
+func NewCommentService(
+	tr Transactor,
+	cr CommentRepository,
+	pr CommentPostRepo,
+	is ImageStorage,
+) *CommentService {
+	return &CommentService{tr, cr, pr, is}
 }
 
 func (s *CommentService) SaveComment(ctx context.Context, comment *domain.Comment, imageData []byte) (int64, error) {
+	const op = "CommentService.SaveComment"
+
+	// Проверка поста
 	post, err := s.postRepo.GetPostByID(ctx, comment.PostID)
 	if err != nil {
-		return -1, fmt.Errorf("post not found: %w", err)
+		raw := fmt.Errorf("%s: get post: %w", op, err)
+		return -1, svcerr.NewError("post not found", raw, svcerr.ErrNotFound)
 	}
 	if post.IsArchived {
-		return -1, fmt.Errorf("post is archived, new comments are prohibited")
+		raw := fmt.Errorf("%s: post is archived", op)
+		return -1, svcerr.NewError("post is archived, new comments are prohibited", raw, svcerr.ErrBadRequest)
 	}
+
+	// Загрузка изображения
 	if len(imageData) > 0 {
 		url, err := s.imageStorage.UploadImage(ctx, comment.Author.ID, imageData)
 		if err != nil {
-			return -1, err
+			raw := fmt.Errorf("%s: upload image: %w", op, err)
+			return -1, svcerr.NewError("failed to upload comment image", raw, svcerr.ErrInternal)
 		}
 		comment.ImagePath = url
 	}
-	var id int64 = -1
+
+	// Транзакция: сохранение комментария + продление expires_at
+	var id int64
 	err = s.transactor.WithinTransaction(ctx, func(txCtx context.Context) error {
-		if id, err = s.commentRepo.SaveComment(txCtx, comment); err != nil {
-			return fmt.Errorf("failed to save comment: %w", err)
+		var innerErr error
+		id, innerErr = s.commentRepo.SaveComment(txCtx, comment)
+		if innerErr != nil {
+			raw := fmt.Errorf("%s: save comment: %w", op, innerErr)
+			return svcerr.NewError("failed to save comment", raw, svcerr.ErrInternal)
 		}
 
 		if err := s.postRepo.UpdateExpiresAt(txCtx, comment.PostID, time.Now().Add(15*time.Minute)); err != nil {
-			return fmt.Errorf("failed to update post: %w", err)
+			raw := fmt.Errorf("%s: update post expires: %w", op, err)
+			return svcerr.NewError("failed to update post expiration", raw, svcerr.ErrInternal)
 		}
 
 		return nil
@@ -79,9 +82,16 @@ func (s *CommentService) SaveComment(ctx context.Context, comment *domain.Commen
 	if err != nil {
 		return -1, err
 	}
+
 	return id, nil
 }
 
 func (s *CommentService) GetByPostID(ctx context.Context, postID int64) ([]*domain.Comment, error) {
-	return s.commentRepo.GetByPostID(ctx, postID)
+	const op = "CommentService.GetByPostID"
+	comments, err := s.commentRepo.GetByPostID(ctx, postID)
+	if err != nil {
+		raw := fmt.Errorf("%s: get comments: %w", op, err)
+		return nil, svcerr.NewError("failed to load comments", raw, svcerr.ErrInternal)
+	}
+	return comments, nil
 }

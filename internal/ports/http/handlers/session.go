@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"go-hex-forum/internal/core/domain"
 	"go-hex-forum/internal/core/service"
+	"go-hex-forum/internal/ports/http/httperror"
 	"go-hex-forum/internal/utils"
-	"log"
+	"html/template"
+	"log/slog"
 	"net/http"
 	"time"
 )
@@ -19,11 +21,13 @@ type SessionService interface {
 }
 
 type SessionHandler struct {
+	templates      *template.Template
 	SessionService SessionService
+	logger         *slog.Logger
 }
 
-func NewSessionHandler(sessionService SessionService) SessionHandler {
-	return SessionHandler{sessionService}
+func NewSessionHandler(tmpl *template.Template, sessionService SessionService, logger *slog.Logger) SessionHandler {
+	return SessionHandler{tmpl, sessionService, logger}
 }
 
 func (s *SessionHandler) RegisterEndpoints(mux *http.ServeMux) {
@@ -33,11 +37,11 @@ func (s *SessionHandler) RegisterEndpoints(mux *http.ServeMux) {
 func (s *SessionHandler) UpdateUserName(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
-		utils.WriteError(w, http.StatusBadRequest, errors.New("could not parse form"))
+		httperror.WriteError(w, errors.New("could not parse form"))
 	}
 
 	newnickname := r.FormValue("nickname")
-
+	source := r.FormValue("source")
 	tokenCookie, ok := r.Context().Value("session_token").(string)
 	if !ok {
 		utils.WriteError(w, http.StatusUnauthorized, errors.New("unauthorized"))
@@ -46,14 +50,15 @@ func (s *SessionHandler) UpdateUserName(w http.ResponseWriter, r *http.Request) 
 
 	err = s.SessionService.UpdateUserName(r.Context(), tokenCookie, newnickname)
 	if err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, fmt.Errorf("failed username change", err))
+		if source == "frontend" {
+			fmt.Println("here")
+			s.renderErrorPage(w, err)
+			return
+		}
+		httperror.WriteError(w, err)
 		return
 	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
-}
-
-func helloworld(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Hello"))
 }
 
 func (s *SessionHandler) WithSessionToken(expirationInSec int64) func(next http.Handler) http.Handler {
@@ -111,11 +116,27 @@ func (s *SessionHandler) RequireValidSession(next http.Handler) http.Handler {
 				return
 			}
 			utils.WriteError(w, http.StatusUnauthorized, errors.New("unauthorized: invalid session"))
-			log.Print(err.Error())
 			return
 		}
-		// fmt.Println("Session  here:", session)
 		ctx := context.WithValue(r.Context(), "session", session)
 		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func (h *SessionHandler) renderTemplate(w http.ResponseWriter, name string, data interface{}) {
+	err := h.templates.ExecuteTemplate(w, name, data)
+	if err != nil {
+		httperror.WriteError(w, err)
+	}
+}
+
+func (h *SessionHandler) renderErrorPage(w http.ResponseWriter, err error) {
+	apiErr := httperror.FromError(err)
+	h.renderTemplate(w, "error.html", struct {
+		Message    string
+		StatusCode int
+	}{
+		Message:    apiErr.Message,
+		StatusCode: apiErr.StatusCode,
 	})
 }

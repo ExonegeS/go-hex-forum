@@ -11,9 +11,11 @@ import (
 	"go-hex-forum/internal/core/service"
 	"go-hex-forum/internal/ports/http/handlers"
 	"go-hex-forum/internal/ports/http/middleware"
+	"go-hex-forum/internal/utils"
 	"html/template"
 	"log/slog"
 	"net/http"
+	"path/filepath"
 	"time"
 )
 
@@ -21,22 +23,43 @@ type APIServer struct {
 	cfg    *config.Config
 	db     *sql.DB
 	logger *slog.Logger
-	tpl    *template.Template
 }
 
-func NewAPIServer(config *config.Config, db *sql.DB, logger *slog.Logger, tpl *template.Template) *APIServer {
-	return &APIServer{config, db, logger, tpl}
+func NewAPIServer(config *config.Config, db *sql.DB, logger *slog.Logger) *APIServer {
+	return &APIServer{config, db, logger}
 }
 
 func (s *APIServer) Run() error {
 	ctx := context.Background()
+	if s.cfg == nil {
+		return fmt.Errorf("cannot start, config is nil")
+	}
+	if s.db == nil {
+		return fmt.Errorf("cannot start, db is nil")
+	}
+	if s.logger == nil {
+		return fmt.Errorf("cannot start, logger is nil")
+	}
+	// Loading templates for frontend part of the application
 
-	frontendHandlers := http.NewServeMux()
-	apiHandlers := http.NewServeMux()
+	tpl := template.New("post.html").Funcs(template.FuncMap{
+		"formatTime": utils.FormatTime,
+	})
+
+	tpl, err := tpl.ParseGlob(filepath.Join("web", "templates", "*.html"))
+	if err != nil {
+		s.logger.Error("Failed to load templates", "error", err.Error())
+		return err
+	}
+
+	//separating frontend handlers from api handlers
+	frontendMux := http.NewServeMux()
+	apiMux := http.NewServeMux()
+
 	router := http.NewServeMux()
 
-	router.Handle("/api/", http.StripPrefix("/api", apiHandlers))
-	router.Handle("/", frontendHandlers)
+	router.Handle("/api/", http.StripPrefix("/api", apiMux))
+	router.Handle("/", frontendMux)
 
 	// Transactor
 	transactor := postgres.NewTransactor(s.db)
@@ -48,8 +71,8 @@ func (s *APIServer) Run() error {
 	// Session
 	SessionRepository := postgres.NewSessionRepository(s.db)
 	SessionService := service.NewSessionService(SessionRepository, time.Now, UserdataProvider, s.cfg.SessionConfig)
-	SessionHandler := handlers.NewSessionHandler(SessionService)
-	SessionHandler.RegisterEndpoints(apiHandlers)
+	SessionHandler := handlers.NewSessionHandler(tpl, SessionService, s.logger)
+	SessionHandler.RegisterEndpoints(apiMux)
 
 	// Post
 	PostRepository := postgres.NewPostRepository(s.db)
@@ -57,17 +80,17 @@ func (s *APIServer) Run() error {
 
 	go PostService.ArchiveExpiredPostsWorker(ctx)
 	PostHandler := handlers.NewPostHandler(PostService)
-	PostHandler.RegisterEndpoints(apiHandlers)
+	PostHandler.RegisterEndpoints(apiMux)
 
 	// Comment
 	CommentRepository := postgres.NewCommentRepository(s.db)
 	CommentService := service.NewCommentService(transactor, CommentRepository, PostRepository, ImageStorage)
 	CommentHandler := handlers.NewCommentHandler(CommentService)
-	CommentHandler.RegisterEndpoints(apiHandlers)
+	CommentHandler.RegisterEndpoints(apiMux)
 
 	// rendering pages and calls on /api
-	frontendHandler := handlers.NewFrontendHandler(PostService, SessionService, CommentService, s.tpl)
-	frontendHandler.RegisterFrontendEndpoints(frontendHandlers)
+	frontendHandler := handlers.NewFrontendHandler(PostService, SessionService, CommentService, tpl)
+	frontendHandler.RegisterFrontendEndpoints(frontendMux)
 
 	// Middlewares
 	SessionMiddleware := SessionHandler.WithSessionToken(int64(s.cfg.SessionConfig.DefaultTTL.Seconds()))

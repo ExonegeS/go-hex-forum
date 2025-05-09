@@ -89,6 +89,23 @@
         }
         .comment-form input[type="submit"]:hover { background-color: #c0c4d8; }
     </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.local-time').forEach(element => {
+                const utcTime = element.getAttribute('datetime');
+                const localTime = new Date(utcTime).toLocaleString();
+                element.textContent = localTime;
+            });
+        });
+
+        document.querySelectorAll('.reply-button').forEach(button => {
+            button.addEventListener('click', function(e) {
+                const parentId = this.dataset.commentId;
+                document.getElementById('parent_comment_id').value = parentId;
+                document.querySelector('.comment-form textarea').focus();
+            });
+        });
+    </script>
 </head>
 <body>
 <header>
@@ -104,7 +121,9 @@
     <div class="post">
         <div class="post-header">
             <div class="title">{{.Title}}</div>
-            <div class="meta">Created: {{formatTime .DataTime}}</div>
+            <time datetime="{{.DataTime}}" class="meta local-time">
+                {{formatTime .DataTime}} UTC
+            </time>
         </div>
         <div class="user-line">
             {{if .UserAvatar}}<img src="{{.UserAvatar}}" alt="avatar">{{end}}
@@ -136,7 +155,9 @@
                         {{if .Author.AvatarURL}}<img src="{{.Author.AvatarURL}}" alt="avatar">{{end}}
                         <span class="name">{{.Author.Name}}</span>
                     </div>
-                    <div class="meta">{{formatTime .CreatedAt}}</div>
+                    <time datetime="{{.CreatedAt}}" class="meta local-time">
+                        {{formatTime .CreatedAt}} UTC
+                    </time>
                 </div>
                 <div class="content-wrapper">
                     {{if .ImagePath}}
@@ -148,6 +169,14 @@
                         <blockquote>{{.Content}}</blockquote>
                     </div>
                 </div>
+                <div class="add-comment">
+                    <form class="comment-form" action="/api/post/{{.PostID}}/comment" method="POST" enctype="multipart/form-data">
+                        <input type="hidden" name="parent_comment_id" id="parent_comment_id" value="">
+                        <textarea name="comment" placeholder="Write your comment here..."></textarea><br>
+                        <input name="image" type="file" accept="image/jpeg, image/png, image/gif"><br>
+                        <input type="submit" value="Post Comment">
+                    </form>
+                </div>
             </div>
             {{end}}
         {{else}}
@@ -158,7 +187,7 @@
     <div class="add-comment">
         <form class="comment-form" action="/api/post/{{.PostID}}/comment" method="POST" enctype="multipart/form-data">
             <textarea name="comment" placeholder="Write your comment here..."></textarea><br>
-            <input type="file" name="image"><br>
+            <input name="image" type="file" accept="image/jpeg, image/png, image/gif"><br>
             <input type="submit" value="Post Comment">
         </form>
     </div>

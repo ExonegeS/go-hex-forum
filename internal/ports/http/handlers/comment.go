@@ -36,6 +36,15 @@ func (h *CommentHandler) CreateNewComment(w http.ResponseWriter, r *http.Request
 	}
 
 	content := r.FormValue("comment")
+
+	var parentCommentID *int64
+	if rawParentID := r.FormValue("parent_comment_id"); rawParentID != "" {
+		id, err := strconv.ParseInt(rawParentID, 10, 64)
+		if err == nil {
+			parentCommentID = &id
+		}
+	}
+
 	file, _, err := r.FormFile("image")
 	if err != nil && err != http.ErrMissingFile {
 		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("error reading image: %w", err))
@@ -67,8 +76,9 @@ func (h *CommentHandler) CreateNewComment(w http.ResponseWriter, r *http.Request
 	}
 
 	comment := domain.Comment{
-		PostID:  postID,
-		Content: content,
+		PostID:          postID,
+		ParentCommentID: parentCommentID,
+		Content:         content,
 		Author: domain.UserData{
 			ID: session.User.ID,
 		},

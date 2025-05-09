@@ -16,13 +16,14 @@ func NewCommentRepository(db *sql.DB) *CommentRepository {
 }
 
 func (r *CommentRepository) SaveComment(ctx context.Context, comment *domain.Comment) (int64, error) {
+	const op = "CommentRepository.SaveComment"
+
 	query := `
         INSERT INTO comments (post_id, user_id, content, image_path)
         VALUES ($1, $2, $3, $4)
         RETURNING id
     `
 
-	// Handle nullable image path
 	imagePath := sql.NullString{
 		String: comment.ImagePath,
 		Valid:  comment.ImagePath != "",
@@ -37,7 +38,7 @@ func (r *CommentRepository) SaveComment(ctx context.Context, comment *domain.Com
 	).Scan(&id)
 
 	if err != nil {
-		return 0, fmt.Errorf("failed to save comment: %w", err)
+		return 0, fmt.Errorf("%s: %w", op, err)
 	}
 
 	comment.ID = id
@@ -45,6 +46,8 @@ func (r *CommentRepository) SaveComment(ctx context.Context, comment *domain.Com
 }
 
 func (r *CommentRepository) GetByPostID(ctx context.Context, postID int64) ([]*domain.Comment, error) {
+	const op = "CommentRepository.GetByPostID"
+
 	query := `
         SELECT c.id, u.name, COALESCE(u.avatar_url, '') AS avatar_url, 
                c.content, c.image_path, c.created_at
@@ -56,7 +59,7 @@ func (r *CommentRepository) GetByPostID(ctx context.Context, postID int64) ([]*d
 
 	rows, err := r.br.queryContext(ctx, query, postID)
 	if err != nil {
-		return nil, fmt.Errorf("querying comments: %w", err)
+		return nil, fmt.Errorf("%s: querying comments: %w", op, err)
 	}
 	defer rows.Close()
 
@@ -66,7 +69,7 @@ func (r *CommentRepository) GetByPostID(ctx context.Context, postID int64) ([]*d
 		var imagePath sql.NullString
 		err := rows.Scan(&c.ID, &c.Author.Name, &c.Author.AvatarURL, &c.Content, &imagePath, &c.CreatedAt)
 		if err != nil {
-			return nil, fmt.Errorf("scanning comment: %w", err)
+			return nil, fmt.Errorf("%s: scanning comment: %w", op, err)
 		}
 		if imagePath.Valid {
 			c.ImagePath = imagePath.String
@@ -77,7 +80,7 @@ func (r *CommentRepository) GetByPostID(ctx context.Context, postID int64) ([]*d
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rows: %w", err)
+		return nil, fmt.Errorf("%s: iterating rows: %w", op, err)
 	}
 
 	return comments, nil

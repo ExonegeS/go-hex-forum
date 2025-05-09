@@ -2,10 +2,11 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"go-hex-forum/internal/core/domain"
 	"time"
+
+	"go-hex-forum/internal/core/domain"
+	"go-hex-forum/pkg/svcerr"
 )
 
 type PostRepository interface {
@@ -13,7 +14,6 @@ type PostRepository interface {
 	GetActivePosts(ctx context.Context, pagination *domain.Pagination) ([]domain.Post, error)
 	GetArchivedPosts(ctx context.Context, pagination *domain.Pagination) ([]domain.Post, error)
 	GetPostByID(ctx context.Context, postID int64) (domain.Post, error)
-	// UpdateExpiresAt(ctx context.Context, postID int64, timeInSec time.Duration) error
 	ArchiveExpiredPosts(ctx context.Context) error
 }
 
@@ -28,72 +28,77 @@ type PostService struct {
 }
 
 func NewPostService(postRepo PostRepository, imageStorage ImageStorage) *PostService {
-	return &PostService{
-		postRepo,
-		imageStorage,
-	}
+	return &PostService{postRepo, imageStorage}
 }
 
 func (s *PostService) CreateNewPost(ctx context.Context, post *domain.Post, imageData []byte) (int64, error) {
+	const op = "PostService.CreateNewPost"
+	// validation
 	if post.Title == "" || post.Content == "" {
-		return -1, errors.New("title and content are required")
+		err := fmt.Errorf("%s: title and content are not provided", op)
+		return -1, svcerr.NewError("title and content are required", err, svcerr.ErrBadRequest)
 	}
 	post.CreatedAt = time.Now().UTC()
-	post.ExpiresAt = time.Now().UTC().Add(10 * time.Minute)
+	// initial expiration
+	post.ExpiresAt = post.CreatedAt.Add(10 * time.Minute)
+
 	if len(imageData) > 0 {
 		url, err := s.imageStorage.UploadImage(ctx, post.PostAuthor.ID, imageData)
 		if err != nil {
-			return -1, err
+			raw := fmt.Errorf("%s: upload image failed: %w", op, err)
+			return -1, svcerr.NewError("failed to upload image", raw, svcerr.ErrInternal)
 		}
 		post.ImagePath = url
 	}
 
-	return s.postRepo.SavePost(ctx, post, post.PostAuthor.ID)
+	id, err := s.postRepo.SavePost(ctx, post, post.PostAuthor.ID)
+	if err != nil {
+		raw := fmt.Errorf("%s: save post failed: %w", op, err)
+		return -1, svcerr.NewError("failed to save post", raw, svcerr.ErrInternal)
+	}
+	return id, nil
 }
 
 func (s *PostService) GetActivePosts(ctx context.Context) ([]domain.Post, error) {
-	pagination := &domain.Pagination{
-		Page:     1,
-		PageSize: 10,
+	posts, err := s.postRepo.GetActivePosts(ctx, &domain.Pagination{Page: 1, PageSize: 10})
+	if err != nil {
+		raw := fmt.Errorf("PostService.GetActivePosts: %w", err)
+		return nil, svcerr.NewError("failed to get active posts", raw, svcerr.ErrInternal)
 	}
-	return s.postRepo.GetActivePosts(ctx, pagination)
+	return posts, nil
 }
+
 func (s *PostService) GetArchivedPosts(ctx context.Context) ([]domain.Post, error) {
-	pagination := &domain.Pagination{
-		Page:     1,
-		PageSize: 10,
+	posts, err := s.postRepo.GetArchivedPosts(ctx, &domain.Pagination{Page: 1, PageSize: 10})
+	if err != nil {
+		raw := fmt.Errorf("PostService.GetArchivedPosts: %w", err)
+		return nil, svcerr.NewError("failed to get archived posts", raw, svcerr.ErrInternal)
 	}
-	return s.postRepo.GetArchivedPosts(ctx, pagination)
+	return posts, nil
 }
 
 func (s *PostService) GetPostByID(ctx context.Context, postID int64) (domain.Post, error) {
-	return s.postRepo.GetPostByID(ctx, postID)
-}
-
-func (s *PostService) UploadImage(ctx context.Context, userID int64, imageData []byte) (string, error) {
-	publicURL, err := s.imageStorage.UploadImage(ctx, userID, imageData)
+	const op = "PostService.GetPostByID"
+	post, err := s.postRepo.GetPostByID(ctx, postID)
 	if err != nil {
-		return "", fmt.Errorf("failed to upload image: %w", err)
+		raw := fmt.Errorf("%s: %w", op, err)
+		return domain.Post{}, svcerr.NewError("post not found", raw, svcerr.ErrNotFound)
 	}
-	return publicURL, nil
+	return post, nil
 }
 
 func (s *PostService) ArchiveExpiredPostsWorker(ctx context.Context) {
 	ticker := time.NewTicker(time.Minute)
-	fmt.Print("not tick yet")
 	go func() {
 		for {
 			select {
 			case <-ticker.C:
 				err := s.postRepo.ArchiveExpiredPosts(ctx)
 				if err != nil {
-					fmt.Println("error bratha", err)
-					return
+					// optionally log or handle
 				}
-				fmt.Print("tick!")
 			case <-ctx.Done():
 				ticker.Stop()
-				fmt.Print("tick stop")
 				return
 			}
 		}

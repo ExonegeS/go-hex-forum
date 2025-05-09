@@ -1,13 +1,37 @@
-<!-- templates/error.html -->
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Error {{.Code}}</title>
+    <meta charset="UTF-8">
+    <title>Error</title>
+    <style>
+        body {
+            font-family: monospace;
+            background-color: #ffe6e6;
+            color: #900;
+            text-align: center;
+            padding: 50px;
+        }
+        .error-code {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        .buttons a, .buttons button {
+            font-family: monospace;
+            margin: 10px;
+            padding: 8px 16px;
+            text-decoration: none;
+            color: #fff;
+            background-color: #900;
+            border: none;
+            cursor: pointer;
+        }
+    </style>
 </head>
 <body>
-<h1>Error {{.Code}} - {{.Message}}</h1>
-<p>Sorry, an error has occurred.</p>
-<a href="javascript:history.back()">Go Back</a> |
-<a href="/">Return to Home Page</a>
+    <div class="error-code">{{.StatusCode}} {{.Message}}</div>
+    <div class="buttons">
+        <button onclick="window.history.back()">Back</button>
+        <a href="/catalog">Go to Catalog</a>
+    </div>
 </body>
 </html>
