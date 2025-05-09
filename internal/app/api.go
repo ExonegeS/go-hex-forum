@@ -8,6 +8,7 @@ import (
 	"go-hex-forum/internal/adapters/postgres"
 	rickmorty "go-hex-forum/internal/adapters/rickmorty_client"
 	"go-hex-forum/internal/adapters/storage"
+	"go-hex-forum/internal/core/domain"
 	"go-hex-forum/internal/core/service"
 	"go-hex-forum/internal/ports/http/handlers"
 	"go-hex-forum/internal/ports/http/middleware"
@@ -16,6 +17,7 @@ import (
 	"log/slog"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -40,10 +42,31 @@ func (s *APIServer) Run() error {
 	if s.logger == nil {
 		return fmt.Errorf("cannot start, logger is nil")
 	}
-	// Loading templates for frontend part of the application
 
+	// Loading templates for frontend part of the application
 	tpl := template.New("post.html").Funcs(template.FuncMap{
+		"commentArgs": func(comment *domain.Comment, allComments []*domain.Comment, postID int64, depth int) map[string]interface{} {
+			return map[string]interface{}{
+				"Comment":     comment,
+				"AllComments": allComments,
+				"PostID":      postID,
+				"Depth":       depth,
+			}
+		},
 		"formatTime": utils.FormatTime,
+		"getReplies": func(comments []*domain.Comment, parentID int64) []*domain.Comment {
+			var replies []*domain.Comment
+			for _, c := range comments {
+				if c.ParentCommentID != nil && *c.ParentCommentID == parentID {
+					replies = append(replies, c)
+				}
+			}
+			return replies
+		},
+		"add": func(a, b int) int { return a + b },
+		"nl2br": func(text string) template.HTML {
+			return template.HTML(strings.ReplaceAll(template.HTMLEscapeString(text), "\n", "<br>"))
+		},
 	})
 
 	tpl, err := tpl.ParseGlob(filepath.Join("web", "templates", "*.html"))
@@ -56,6 +79,11 @@ func (s *APIServer) Run() error {
 	frontendMux := http.NewServeMux()
 	apiMux := http.NewServeMux()
 
+	frontendMux.Handle("/static/",
+		http.StripPrefix("/static/",
+			http.FileServer(http.Dir(filepath.Join("web", "static"))),
+		),
+	)
 	router := http.NewServeMux()
 
 	router.Handle("/api/", http.StripPrefix("/api", apiMux))
@@ -89,13 +117,13 @@ func (s *APIServer) Run() error {
 	CommentHandler.RegisterEndpoints(apiMux)
 
 	// rendering pages and calls on /api
-	frontendHandler := handlers.NewFrontendHandler(PostService, SessionService, CommentService, tpl)
+	frontendHandler := handlers.NewFrontendHandler(PostService, SessionService, CommentService, tpl, s.logger)
 	frontendHandler.RegisterFrontendEndpoints(frontendMux)
 
 	// Middlewares
 	SessionMiddleware := SessionHandler.WithSessionToken(int64(s.cfg.SessionConfig.DefaultTTL.Seconds()))
 	TimeoutMW := middleware.NewTimeoutContextMW(15)
-	MWChain := middleware.NewMiddlewareChain(TimeoutMW, SessionMiddleware, SessionHandler.RequireValidSession)
+	MWChain := middleware.NewMiddlewareChain(middleware.RecoveryMW, TimeoutMW, SessionMiddleware, SessionHandler.RequireValidSession)
 
 	serverAddress := fmt.Sprintf("%s:%s", s.cfg.Server.Address, s.cfg.Server.Port)
 	s.logger.Info("starting server", slog.String("host", serverAddress))

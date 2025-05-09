@@ -1,3 +1,54 @@
+{{define "comment"}}
+<div class="comment {{if gt .Depth 0}}reply{{end}}" data-depth="{{.Depth}}" id="comment-{{.Comment.ID}}">
+    <div class="comment-header">
+        <div class="user-line">
+            {{if .Comment.Author.AvatarURL}}<img src="{{.Comment.Author.AvatarURL}}" alt="avatar">{{end}}
+            <span class="name">{{.Comment.Author.Name}}</span>
+            {{if gt .Depth 0}}
+                <span class="reply-to">→ #{{.Comment.ParentCommentID}}</span>
+            {{end}}
+        </div>
+        <time datetime="{{.Comment.CreatedAt}}" class="meta local-time">
+            {{formatTime .Comment.CreatedAt}} UTC
+        </time>
+        <button type="button" class="reply-button" data-comment-id="{{.Comment.ID}}">Reply</button>
+    </div>
+    
+    <div class="content-wrapper">
+        {{if .Comment.ImagePath}}
+        <div class="comment-image">
+            <a href="{{.Comment.ImagePath}}"><img src="{{.Comment.ImagePath}}" alt="Comment image"></a>
+        </div>
+        {{end}}
+        <div class="text-block">
+            <blockquote>{{.Comment.Content}}</blockquote>
+        </div>
+    </div>
+
+    <!-- Reply form (initially hidden) -->
+    <div class="reply-form" style="display: none;">
+        <form action="/post/{{.PostID}}/comment" method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="parent_comment_id" value="{{.Comment.ID}}">
+            <textarea name="comment" placeholder="Write your reply..." rows="2"></textarea>
+            <div class="form-controls">
+                <input name="image" type="file" accept="image/jpeg, image/png, image/gif">
+                <input type="submit" value="Post Reply">
+            </div>
+        </form>
+    </div>
+
+    <!-- Nested replies -->
+    {{$replies := getReplies .AllComments .Comment.ID}}
+    {{if $replies}}
+        <div class="replies">
+            {{range $reply := $replies}}
+                {{template "comment" (commentArgs $reply .AllComments .PostID (add .Depth 1))}}
+            {{end}}
+        </div>
+    {{end}}
+</div>
+{{end}}
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -66,9 +117,12 @@
         }
         .file-info { font-size: 0.8em; color: #666; margin-top: 3px; }
         blockquote {
-            margin: 0; padding: 10px;
+            margin: 0;
+            padding: 10px;
             background: #e0e4ff;
             border-left: 4px solid #000;
+            white-space: pre-wrap;
+            word-wrap: break-word;
         }
         .add-comment {
             border-top: 2px solid #000;
@@ -89,22 +143,32 @@
         }
         .comment-form input[type="submit"]:hover { background-color: #c0c4d8; }
     </style>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            document.querySelectorAll('.local-time').forEach(element => {
-                const utcTime = element.getAttribute('datetime');
-                const localTime = new Date(utcTime).toLocaleString();
-                element.textContent = localTime;
-            });
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Time conversion
+        document.querySelectorAll('.local-time').forEach(element => {
+            const utcTime = element.getAttribute('datetime');
+            const localTime = new Date(utcTime).toLocaleString();
+            element.textContent = localTime;
         });
-
-        document.querySelectorAll('.reply-button').forEach(button => {
-            button.addEventListener('click', function(e) {
-                const parentId = this.dataset.commentId;
-                document.getElementById('parent_comment_id').value = parentId;
-                document.querySelector('.comment-form textarea').focus();
+        // Single event delegation for all reply buttons
+        document.addEventListener('click', function(e) {
+            const button = e.target.closest('.reply-button');
+            if (!button) return;
+            const commentDiv = button.closest('.comment');
+            const form = commentDiv.querySelector('.reply-form');
+            // Close all other forms
+            document.querySelectorAll('.reply-form').forEach(f => {
+                if (f !== form) f.style.display = 'none';
             });
+            // Toggle current form
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+            // Scroll if opening
+            if (form.style.display === 'block') {
+                form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
         });
+    });
     </script>
 </head>
 <body>
@@ -137,55 +201,29 @@
             </div>
             {{end}}
             <div class="text-block">
-                <blockquote>{{.Content}}</blockquote>
+                <blockquote>{{.Content | nl2br}}</blockquote>
             </div>
         </div>
     </div>
     <!-- Comments -->
     <div class="comments">
         <div class="comment-header">
-            <div>Replies ({{len .Comments}})</div>
-            <div></div>
+            <div>Comments ({{len .Comments}})</div>
         </div>
         {{if .Comments}}
-            {{range .Comments}}
-            <div class="comment">
-                <div class="comment-header">
-                    <div class="user-line">
-                        {{if .Author.AvatarURL}}<img src="{{.Author.AvatarURL}}" alt="avatar">{{end}}
-                        <span class="name">{{.Author.Name}}</span>
-                    </div>
-                    <time datetime="{{.CreatedAt}}" class="meta local-time">
-                        {{formatTime .CreatedAt}} UTC
-                    </time>
-                </div>
-                <div class="content-wrapper">
-                    {{if .ImagePath}}
-                    <div class="comment-image">
-                        <a href="{{.ImagePath}}"><img src="{{.ImagePath}}" alt="Comment image"></a>
-                    </div>
-                    {{end}}
-                    <div class="text-block">
-                        <blockquote>{{.Content}}</blockquote>
-                    </div>
-                </div>
-                <div class="add-comment">
-                    <form class="comment-form" action="/api/post/{{.PostID}}/comment" method="POST" enctype="multipart/form-data">
-                        <input type="hidden" name="parent_comment_id" id="parent_comment_id" value="">
-                        <textarea name="comment" placeholder="Write your comment here..."></textarea><br>
-                        <input name="image" type="file" accept="image/jpeg, image/png, image/gif"><br>
-                        <input type="submit" value="Post Comment">
-                    </form>
-                </div>
-            </div>
+            {{range $comment := .Comments}}
+                {{if not $comment.ParentCommentID}}
+                    {{template "comment" (commentArgs $comment $.Comments $.PostID 0)}}
+                {{end}}
             {{end}}
         {{else}}
             <div class="no-comments">No comments yet</div>
         {{end}}
     </div>
+    
     <!-- Add Comment Form -->
     <div class="add-comment">
-        <form class="comment-form" action="/api/post/{{.PostID}}/comment" method="POST" enctype="multipart/form-data">
+        <form class="comment-form" action="/post/{{.PostID}}/comment" method="POST" enctype="multipart/form-data">
             <textarea name="comment" placeholder="Write your comment here..."></textarea><br>
             <input name="image" type="file" accept="image/jpeg, image/png, image/gif"><br>
             <input type="submit" value="Post Comment">

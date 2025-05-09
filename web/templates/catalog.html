@@ -122,7 +122,11 @@
           {{range .Posts}}
             <li class="post">
               <a href="/post/{{.ID}}">
-                <img src="{{.ImagePath}}" alt="no pic">
+                {{ if .ImagePath}}
+                  <img src="{{.ImagePath}}" alt="no pic">
+                {{else}}
+                  <img src="/static/no-image.png" alt="no pic">
+                {{end}}
                 <h3>{{.Title}}</h3>
               </a>
             </li>

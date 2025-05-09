@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"errors"
-	"fmt"
 	"go-hex-forum/internal/core/domain"
 	"go-hex-forum/internal/core/service"
 	"go-hex-forum/internal/ports/http/httperror"
@@ -41,7 +40,6 @@ func (s *SessionHandler) UpdateUserName(w http.ResponseWriter, r *http.Request) 
 	}
 
 	newnickname := r.FormValue("nickname")
-	source := r.FormValue("source")
 	tokenCookie, ok := r.Context().Value("session_token").(string)
 	if !ok {
 		utils.WriteError(w, http.StatusUnauthorized, errors.New("unauthorized"))
@@ -50,11 +48,6 @@ func (s *SessionHandler) UpdateUserName(w http.ResponseWriter, r *http.Request) 
 
 	err = s.SessionService.UpdateUserName(r.Context(), tokenCookie, newnickname)
 	if err != nil {
-		if source == "frontend" {
-			fmt.Println("here")
-			s.renderErrorPage(w, err)
-			return
-		}
 		httperror.WriteError(w, err)
 		return
 	}
@@ -120,23 +113,5 @@ func (s *SessionHandler) RequireValidSession(next http.Handler) http.Handler {
 		}
 		ctx := context.WithValue(r.Context(), "session", session)
 		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
-
-func (h *SessionHandler) renderTemplate(w http.ResponseWriter, name string, data interface{}) {
-	err := h.templates.ExecuteTemplate(w, name, data)
-	if err != nil {
-		httperror.WriteError(w, err)
-	}
-}
-
-func (h *SessionHandler) renderErrorPage(w http.ResponseWriter, err error) {
-	apiErr := httperror.FromError(err)
-	h.renderTemplate(w, "error.html", struct {
-		Message    string
-		StatusCode int
-	}{
-		Message:    apiErr.Message,
-		StatusCode: apiErr.StatusCode,
 	})
 }

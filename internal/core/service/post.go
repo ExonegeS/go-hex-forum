@@ -35,8 +35,14 @@ func (s *PostService) CreateNewPost(ctx context.Context, post *domain.Post, imag
 	const op = "PostService.CreateNewPost"
 	// validation
 	if post.Title == "" || post.Content == "" {
-		err := fmt.Errorf("%s: title and content are not provided", op)
-		return -1, svcerr.NewError("title and content are required", err, svcerr.ErrBadRequest)
+		raw := fmt.Errorf("%s: title and content are not provided", op)
+		return -1, svcerr.NewError("title and content are required", raw, svcerr.ErrBadRequest)
+	}
+	if len(post.Title) > 32 {
+		return -1, svcerr.NewError("too long title", fmt.Errorf("title longer than 32 chars"), svcerr.ErrBadRequest)
+	}
+	if len(post.Title) < 3 {
+		return -1, svcerr.NewError("too short title", fmt.Errorf("itle shorter than 3 chars"), svcerr.ErrBadRequest)
 	}
 	post.CreatedAt = time.Now().UTC()
 	// initial expiration
@@ -95,7 +101,7 @@ func (s *PostService) ArchiveExpiredPostsWorker(ctx context.Context) {
 			case <-ticker.C:
 				err := s.postRepo.ArchiveExpiredPosts(ctx)
 				if err != nil {
-					// optionally log or handle
+					// log or what
 				}
 			case <-ctx.Done():
 				ticker.Stop()

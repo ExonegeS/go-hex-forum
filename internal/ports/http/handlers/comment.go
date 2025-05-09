@@ -36,7 +36,6 @@ func (h *CommentHandler) CreateNewComment(w http.ResponseWriter, r *http.Request
 	}
 
 	content := r.FormValue("comment")
-
 	var parentCommentID *int64
 	if rawParentID := r.FormValue("parent_comment_id"); rawParentID != "" {
 		id, err := strconv.ParseInt(rawParentID, 10, 64)

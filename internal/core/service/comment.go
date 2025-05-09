@@ -40,7 +40,10 @@ func NewCommentService(
 
 func (s *CommentService) SaveComment(ctx context.Context, comment *domain.Comment, imageData []byte) (int64, error) {
 	const op = "CommentService.SaveComment"
-
+	if comment.Content == "" {
+		err := fmt.Errorf("%s: content is not provided", op)
+		return -1, svcerr.NewError("content is required", err, svcerr.ErrBadRequest)
+	}
 	// Проверка поста
 	post, err := s.postRepo.GetPostByID(ctx, comment.PostID)
 	if err != nil {
