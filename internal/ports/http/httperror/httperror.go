@@ -3,8 +3,9 @@ package httperror
 import (
 	"encoding/json"
 	"errors"
-	"go-hex-forum/pkg/svcerr"
 	"net/http"
+
+	"go-hex-forum/pkg/svcerr"
 )
 
 type APIError struct {

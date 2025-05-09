@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+
 	"go-hex-forum/internal/core/domain"
 )
 
@@ -36,7 +37,6 @@ func (r *CommentRepository) SaveComment(ctx context.Context, comment *domain.Com
 		comment.Content,
 		imagePath,
 	).Scan(&id)
-
 	if err != nil {
 		return 0, fmt.Errorf("%s: %w", op, err)
 	}

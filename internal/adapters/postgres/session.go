@@ -5,9 +5,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
+
 	"go-hex-forum/internal/core/domain"
 	"go-hex-forum/internal/core/service"
-	"time"
 )
 
 type SessionRepository struct {
@@ -92,7 +93,6 @@ func (r *SessionRepository) GetByHashedToken(ctx context.Context, hashedToken st
 		&session.User.Name,
 		&session.User.AvatarURL,
 	)
-
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, service.ErrSessionNotFound

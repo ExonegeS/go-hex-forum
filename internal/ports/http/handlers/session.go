@@ -3,14 +3,15 @@ package handlers
 import (
 	"context"
 	"errors"
-	"go-hex-forum/internal/core/domain"
-	"go-hex-forum/internal/core/service"
-	"go-hex-forum/internal/ports/http/httperror"
-	"go-hex-forum/internal/utils"
 	"html/template"
 	"log/slog"
 	"net/http"
 	"time"
+
+	"go-hex-forum/internal/core/domain"
+	"go-hex-forum/internal/core/service"
+	"go-hex-forum/internal/ports/http/httperror"
+	"go-hex-forum/internal/utils"
 )
 
 type SessionService interface {

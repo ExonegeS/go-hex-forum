@@ -3,13 +3,13 @@ package service
 import (
 	"context"
 	"fmt"
-	"go-hex-forum/internal/core/domain"
 	"testing"
 	"time"
+
+	"go-hex-forum/internal/core/domain"
 )
 
-type mockTransactor struct {
-}
+type mockTransactor struct{}
 
 func (m *mockTransactor) WithinTransaction(ctx context.Context, fn func(ctx context.Context) error) error {
 	return fn(ctx)
@@ -28,6 +28,7 @@ func (m *mockPostRepository) SavePost(ctx context.Context, post *domain.Post, us
 	}
 	return -2, nil
 }
+
 func (m *mockPostRepository) GetActivePosts(ctx context.Context, pagination *domain.Pagination) ([]domain.Post, error) {
 	return []domain.Post{}, nil
 }
@@ -42,6 +43,7 @@ func (m *mockPostRepository) GetPostByID(ctx context.Context, postID int64) (dom
 	}
 	return domain.Post{}, nil
 }
+
 func (m *mockPostRepository) UpdateExpiresAt(ctx context.Context, postID int64, expires_at time.Time) error {
 	if m.updateExpireFunc != nil {
 		return m.updateExpireFunc(ctx, postID, expires_at)
@@ -83,12 +85,14 @@ func (m *mockImageStorage) UploadImage(ctx context.Context, userID int64, data [
 	}
 	return "", nil
 }
+
 func (m *mockImageStorage) GetImageURL(userID int64, code string) string {
 	if m.getUrlFunc != nil {
 		return m.getUrlFunc(userID, code)
 	}
 	return ""
 }
+
 func TestCreateComment_Success(t *testing.T) {
 	mockTransactor := &mockTransactor{}
 

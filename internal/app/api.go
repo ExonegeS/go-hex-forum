@@ -4,6 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"html/template"
+	"log/slog"
+	"net/http"
+	"path/filepath"
+	"strings"
+	"time"
+
 	"go-hex-forum/config"
 	"go-hex-forum/internal/adapters/postgres"
 	rickmorty "go-hex-forum/internal/adapters/rickmorty_client"
@@ -13,12 +20,6 @@ import (
 	"go-hex-forum/internal/ports/http/handlers"
 	"go-hex-forum/internal/ports/http/middleware"
 	"go-hex-forum/internal/utils"
-	"html/template"
-	"log/slog"
-	"net/http"
-	"path/filepath"
-	"strings"
-	"time"
 )
 
 type APIServer struct {
@@ -75,7 +76,7 @@ func (s *APIServer) Run() error {
 		return err
 	}
 
-	//separating frontend handlers from api handlers
+	// separating frontend handlers from api handlers
 	frontendMux := http.NewServeMux()
 	apiMux := http.NewServeMux()
 

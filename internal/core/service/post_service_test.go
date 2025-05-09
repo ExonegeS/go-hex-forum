@@ -3,8 +3,9 @@ package service
 import (
 	"context"
 	"fmt"
-	"go-hex-forum/internal/core/domain"
 	"testing"
+
+	"go-hex-forum/internal/core/domain"
 )
 
 func TestCreatePost_Success(t *testing.T) {

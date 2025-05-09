@@ -2,11 +2,11 @@ package main
 
 import (
 	"database/sql"
+	"os"
+
 	"go-hex-forum/config"
 	apiserver "go-hex-forum/internal/app"
 	"go-hex-forum/pkg/lib/prettyslog"
-
-	"os"
 
 	_ "github.com/lib/pq"
 )

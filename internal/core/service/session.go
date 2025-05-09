@@ -8,10 +8,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"time"
+
 	"go-hex-forum/config"
 	"go-hex-forum/internal/core/domain"
 	"go-hex-forum/pkg/svcerr"
-	"time"
 )
 
 type SessionRepository interface {

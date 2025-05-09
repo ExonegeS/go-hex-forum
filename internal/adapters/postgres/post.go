@@ -4,8 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"go-hex-forum/internal/core/domain"
 	"time"
+
+	"go-hex-forum/internal/core/domain"
 )
 
 type PostRepository struct {

@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"go-hex-forum/internal/core/domain"
-	"go-hex-forum/internal/utils"
 	"io"
 	"net/http"
 	"strconv"
 	"time"
+
+	"go-hex-forum/internal/core/domain"
+	"go-hex-forum/internal/utils"
 )
 
 type CommentService interface {

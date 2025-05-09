@@ -1,8 +1,9 @@
 package dto
 
 import (
-	"go-hex-forum/internal/core/domain"
 	"time"
+
+	"go-hex-forum/internal/core/domain"
 )
 
 type PostResponse struct {

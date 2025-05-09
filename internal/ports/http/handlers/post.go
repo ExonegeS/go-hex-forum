@@ -3,10 +3,11 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"go-hex-forum/internal/core/domain"
-	"go-hex-forum/internal/ports/http/httperror"
 	"io"
 	"net/http"
+
+	"go-hex-forum/internal/core/domain"
+	"go-hex-forum/internal/ports/http/httperror"
 )
 
 type PostService interface {

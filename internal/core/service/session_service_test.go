@@ -2,10 +2,11 @@ package service
 
 import (
 	"context"
-	"go-hex-forum/config"
-	"go-hex-forum/internal/core/domain"
 	"testing"
 	"time"
+
+	"go-hex-forum/config"
+	"go-hex-forum/internal/core/domain"
 )
 
 type mockSessionRepository struct {
